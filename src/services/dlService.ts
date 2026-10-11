@@ -197,47 +197,46 @@ class DLService {
         };
       }
       try {
-        const id = `dla-${Date.now().toString().slice(-6)}`;
+        const id = `dla-${crypto.randomUUID().slice(0, 8)}`;
         const nomorSurat = `${Math.floor(100 + Math.random() * 900)}/ST-DL/SKM/${new Date().getMonth() + 1}/${new Date().getFullYear()}`;
-        const { data: newDlRow, error: dlErr } = await supabase
-          .from('dl_assignments')
-          .insert({
-            id,
-            nomor_surat: nomorSurat,
-            subject_user_id: data.subjectUserId,
-            requester_user_id: requesterUserId,
-            purpose: data.purpose,
-            start_date: data.startDate,
-            end_date: data.endDate,
-            state: 'PENDING',
-          })
-          .select(`
-            *,
-            subject:users!dl_assignments_subject_user_id_fkey(nama, jabatan_id, positions(nama)),
-            requester:users!dl_assignments_requester_user_id_fkey(nama, role)
-          `)
-          .single();
+        const rpcLocations = validatedLocations.map((loc) => ({
+          id: loc.id,
+          namaLokasi: loc.namaLokasi,
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          radius: loc.radius,
+        }));
+        const { data: rpcResult, error: dlErr } = await supabase.rpc('create_dl_assignment_with_locations', {
+          p_subject_user_id: data.subjectUserId,
+          p_purpose: data.purpose,
+          p_start_date: data.startDate,
+          p_end_date: data.endDate,
+          p_locations: rpcLocations,
+          p_id: id,
+          p_nomor_surat: nomorSurat,
+        });
 
         if (dlErr) {
           return { success: false, message: `Gagal membuat penugasan DL: ${dlErr.message}` };
         }
-
-        if (newDlRow) {
-          const locsToInsert = validatedLocations.map((loc) => ({
-            id: loc.id,
-            dl_assignment_id: id,
-            nama_lokasi: loc.namaLokasi,
-            latitude: loc.latitude,
-            longitude: loc.longitude,
-            radius_meters: loc.radius,
-            active: true,
-          }));
-          await supabase.from('dl_locations').insert(locsToInsert);
-          newDlRow.dl_locations = locsToInsert;
-          const mapped = mapDbRowToDLAssignment(newDlRow);
-          return { success: true, data: mapped, message: 'Pengajuan Dinas Luar berhasil dibuat (Menunggu Verifikasi)' };
+        if (!rpcResult?.success && !rpcResult?.id) {
+          return { success: false, message: 'Database tidak mengonfirmasi pembuatan penugasan DL.' };
         }
-        return { success: false, message: 'Gagal membuat penugasan DL' };
+        const { data: newDlRow, error: fetchErr } = await supabase
+          .from('dl_assignments')
+          .select(`
+            *,
+            dl_locations(*),
+            dl_evidence(*),
+            subject:users!dl_assignments_subject_user_id_fkey(nama, jabatan_id, positions(nama)),
+            requester:users!dl_assignments_requester_user_id_fkey(nama, role)
+          `)
+          .eq('id', rpcResult.id || id)
+          .single();
+        if (fetchErr || !newDlRow) {
+          return { success: false, message: 'Penugasan dibuat, tetapi detailnya gagal dimuat ulang.' };
+        }
+        return { success: true, data: mapDbRowToDLAssignment(newDlRow), message: 'Pengajuan Dinas Luar berhasil dibuat (Menunggu Verifikasi)' };
       } catch (err: any) {
         return { success: false, message: `Gagal membuat penugasan DL: ${err.message || err}` };
       }
