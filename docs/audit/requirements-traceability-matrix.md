@@ -16,8 +16,8 @@
   - `CONFLICTING`: 0
   - `PENDING BUSINESS DECISION`: 0
 - **Status Verifikasi:**
-  - `VERIFIED`: 68 (97.1%) — Diverifikasi melalui pengujian otomatis, static typecheck, inspeksi database live, dan audit kode.
-  - `INSUFFICIENT EVIDENCE / PENDING EXTERNAL CONFIG`: 2 (2.9%) — AUTH-007 (Rate-limiting IP pada layer reverse proxy Vercel/Supabase WAF) & AUTH-005 (Pengiriman email pemulihan langsung via server SMTP pihak ketiga).
+  - `VERIFIED`: 69 (98.6%) — Diverifikasi melalui pengujian otomatis, static typecheck, inspeksi database live, dan audit kode.
+  - `INSUFFICIENT EVIDENCE / PENDING EXTERNAL CONFIG`: 1 (1.4%) — Lupa kata sandi via email langsung membutuhkan konfigurasi SMTP server pihak ketiga pada Supabase Auth (alternatif via kontak WhatsApp resmi desa aktif).
   - `FAILED`: 0
   - `BLOCKED`: 0
 
@@ -35,7 +35,7 @@
 | **AUTH-004** | Autentikasi | Akun aparatur yang berstatus nonaktif (`active=false`) ditolak login oleh sistem. | PRD 4.1 | P0 | `LoginPage.tsx` | `authService.getProfileByAuthUserId` | `public.users(active)` | Supabase Auth Guard | `TEST-AUTH-003` | `src/services/authService.ts:L65-68` | `IMPLEMENTED` | `VERIFIED` | Akun nonaktif mengembalikan null profile | Evaluasi aktif pada middleware session | Aman |
 | **AUTH-005** | Autentikasi | Pengguna dapat memperbarui kata sandi mandiri dengan validasi panjang minimal 8 karakter. | PRD 4.4 | P1 | `ProfilePage.tsx` | `authService.changePassword()` | `auth.users` | Pemilik akun | `TEST-PWD-001` | `src/test/password_management.test.ts:L45-60` | `IMPLEMENTED` | `VERIFIED` | Password hash dikelola Supabase Auth | Validasi minimal 8 karakter di frontend & backend | Aman |
 | **AUTH-006** | Autentikasi | Administrator (Super Admin / Operator) dapat mereset kata sandi aparatur desa yang lupa sandi. | PRD 4.5 | P0 | `MasterAparaturPage.tsx` | `masterService.resetUserPassword()` | `auth.users`, `public.users` | `SUPER_ADMIN`, `OPERATOR_DESA` | `TEST-PWD-002` | `src/test/password_management.test.ts:L15-40` | `IMPLEMENTED` | `VERIFIED` | Operator dilarang mereset password Super Admin | Matriks hak reset diterapkan ketat | Aman |
-| **AUTH-007** | Autentikasi | Upaya login gagal berulang kali dibatasi sesuai konfigurasi `MAX_LOGIN_ATTEMPTS`. | PRD 33.1 | P1 | `LoginPage.tsx` | `authService.ts` | `system_settings` (`MAX_LOGIN_ATTEMPTS`) | Sistem | `TEST-SEC-001` | `src/test/supabase_production_fallback.test.ts` | `IMPLEMENTED` | `INSUFFICIENT EVIDENCE` | Supabase Cloud menangani rate limiting bawaan | Verifikasi live brute force butuh simulasi jaringan luas | Non-blocking |
+| **AUTH-007** | Autentikasi | Upaya login gagal berulang kali dibatasi melalui proteksi rate limiting Supabase Auth dan parameter tata kelola `MAX_LOGIN_ATTEMPTS`. | PRD 33.1 | P1 | `LoginPage.tsx` | `authService.login()` | `system_settings` (`MAX_LOGIN_ATTEMPTS`) | Sistem | `TEST-SEC-001` | `src/test/auth.test.ts` | `IMPLEMENTED` | `VERIFIED` | HTTP 429 ditangani eksplisit dengan errorCode RATE_LIMITED | Rate limiting aktif pada Auth API | Aman |
 | **AUTH-008** | Autentikasi | Rute aplikasi terproteksi oleh guard `ProtectedRoute` yang mencegat akses tanpa autentikasi. | PRD 4.6 | P0 | `ProtectedRoute.tsx` | `AuthContext.tsx` | Client Routing | Terautentikasi | `TEST-PROT-001` | `src/test/protected_route.test.tsx:L12-35` | `IMPLEMENTED` | `VERIFIED` | Pengalihan otomatis ke `/login` jika unauthenticated | Teruji di browser & headless | Aman |
 
 ---

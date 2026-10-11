@@ -11,6 +11,7 @@ export interface DLLocation {
   id: string;
   dlAssignmentId?: string;
   namaLokasi: string;
+  alamat?: string;
   latitude: number;
   longitude: number;
   radius: number; // default 100m, min 25m, max 500m

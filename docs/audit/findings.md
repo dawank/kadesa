@@ -105,18 +105,62 @@
 
 ---
 
-### FINDING-004: Ketergantungan Eksternal SMTP untuk Pengiriman Email Pemulihan Kata Sandi
+### FINDING-004: Penanganan Lupa Kata Sandi Mandiri Menggunakan Asistensi Kontak Desa (Bukan SMTP)
 - **Severity:** `P3 — LOW`
-- **Status:** **CONFIRMED (EXTERNAL INTEGRATION PREREQUISITE)**
-- **Requirement ID:** `AUTH-005`
-- **Lokasi Kode:** Supabase Auth SMTP Settings
+- **Status:** **RECONCILED (OPERATIONAL DESIGN CHOICE)**
+- **Requirement Terkait:** Lupa Sandi Mandiri (Pelengkap `AUTH-005` & `AUTH-006`)
+- **Lokasi Kode:** [`src/services/authService.ts:L407-425`](file:///d:/DAWANK/APLIKASI_TEST/KADESA/src/services/authService.ts#L407-L425) & Halaman Lupa Sandi
 - **Bukti Aktual:**
-  Fitur lupa sandi pada halaman `/forgot-password` mengarahkan instruksi pemulihan via kontak WhatsApp aparatur terdaftar. Pemanggilan fungsi `supabase.auth.resetPasswordForEmail()` bergantung pada ketersediaan relay server SMTP eksternal.
-- **Skenario Pemicu:**
-  Pengguna meminta tautan pemulihan kata sandi melalui surel (email) langsung dari aplikasi.
-- **Dampak Bisnis:**
-  Jika SMTP pihak ketiga belum dikonfigurasi di dashboard Supabase, email tautan pemulihan tidak akan terkirim ke kotak masuk aparatur.
+  Pada implementasi aktual, `forgotPassword()` mengarahkan pengguna ke kontak bantuan WhatsApp resmi kantor desa (`window.open(waUrl)`), dan tidak menggunakan SMTP email pihak ketiga. Sementara itu, `AUTH-005` murni merujuk pada fitur **Ganti Password Mandiri** (yang telah terverifikasi via `authService.changePassword()`).
 - **Mitigasi Teknis yang Terpasang:**
-  Sistem menyediakan alur administratif resmi yang lebih cocok untuk konteks desa:
-  1. Halaman `/forgot-password` memberikan notifikasi kontak resmi kantor desa.
-  2. Administrator (Super Admin / Operator) dapat melakukan **Admin Reset Password** secara instan melalui menu Master Aparatur ([`MasterAparaturPage.tsx`](file:///d:/DAWANK/APLIKASI_TEST/KADESA/src/pages/master/MasterAparaturPage.tsx)) dengan hak akses terverifikasi.
+  1. Halaman `/forgot-password` memberikan tautan langsung ke nomor WhatsApp resmi desa.
+  2. Administrator desa (Super Admin / Operator) memiliki wewenang **Admin Reset Password** mandiri (`AUTH-006`) pada menu Master Aparatur.
+
+---
+
+### FINDING-005: Transaksi Persetujuan Koreksi Presensi Awalnya Dilakukan Secara Terpisah (Non-Atomik)
+- **Severity:** `P0 — CRITICAL`
+- **Status:** **RESOLVED / CLOSED** (Migration `20261011000002_atomic_correction_and_dl_transactions.sql`)
+- **Requirement ID:** `DB-006`, `CORR-002`
+- **Lokasi Kode:** `src/services/correctionService.ts` & RPC `apply_attendance_correction`
+- **Bukti Aktual:**
+  Persetujuan koreksi sebelumnya dilakukan dalam 2 query terpisah di client: (1) update `attendance_corrections` ke `APPROVED`, (2) update `attendance_records`.
+- **Solusi yang Diterapkan:**
+  Dibuat RPC `apply_attendance_correction` di PostgreSQL dengan `FOR UPDATE` row locking, validasi server-side autoritas penyetuju dan anti-self-approval, eksekusi pembaruan status dan presensi dalam 1 transaksi atomik, dan pencatatan audit log otomatis.
+
+---
+
+### FINDING-006: Pembuatan Penugasan Dinas Luar Multi-Lokasi Awalnya Sequential Insert
+- **Severity:** `P1 — HIGH`
+- **Status:** **RESOLVED / CLOSED** (Migration `20261011000002_atomic_correction_and_dl_transactions.sql`)
+- **Requirement ID:** `DL-001`, `DL-002`
+- **Lokasi Kode:** `src/services/dlService.ts` & RPC `create_dl_assignment_with_locations`
+- **Bukti Aktual:**
+  Pembuatan parent penugasan `dl_assignments` dan multi-lokasi tujuan `dl_locations` sebelumnya dilakukan berurutan via dua panggilan client terpisah.
+- **Solusi yang Diterapkan:**
+  Dibuat RPC `create_dl_assignment_with_locations` yang memvalidasi seluruh payload, tanggal, dan koordinat sebelum commit, serta menyimpan parent assignment dan seluruh lokasi dalam 1 transaksi database atomik dengan rollback otomatis.
+
+---
+
+### FINDING-007: Inkonsistensi Otoritas Persetujuan Dinas Luar
+- **Severity:** `P1 — HIGH`
+- **Status:** **RESOLVED / CLOSED**
+- **Requirement ID:** `DL-005`
+- **Lokasi Kode:** `src/services/authService.ts` & `docs/audit/role-permission-matrix.md`
+- **Bukti Aktual:**
+  Izin `dl_approve` di frontend sebelumnya mengizinkan `OPERATOR_DESA` dan tidak mencantumkan `SUPER_ADMIN`, bertentangan dengan trigger database `enforce_dl_assignment_lifecycle()` yang menetapkan bahwa hanya `KEPALA_DESA`, `SEKRETARIS_DESA`, dan `SUPER_ADMIN` yang berwenang menyetujui surat tugas.
+- **Solusi yang Diterapkan:**
+  Menyelaraskan `authService.hasPermission('dl_approve')` dan matriks peran pada dokumentasi agar konsisten 100% dengan otorisasi database.
+
+---
+
+### FINDING-008: Pembatasan Percobaan Login Gagal (AUTH-007)
+- **Severity:** `P2 — MEDIUM`
+- **Status:** **RESOLVED / RECONCILED**
+- **Requirement ID:** `AUTH-007`
+- **Lokasi Kode:** `src/services/authService.ts:L112-L125`
+- **Bukti Aktual:**
+  Parameter `MAX_LOGIN_ATTEMPTS` ada di database konfigurasi sebagai target tata kelola, namun proteksi brute-force pre-auth saat ini dieksekusi melalui HTTP 429 rate-limiting Supabase Auth.
+- **Solusi yang Diterapkan:**
+  `authService.login()` diperbarui untuk menangani status HTTP 429 dan error rate limit secara eksplisit dengan mengembalikan `errorCode: 'RATE_LIMITED'` dan pesan ramah pengguna. Dokumentasi RTM diselaraskan.
+

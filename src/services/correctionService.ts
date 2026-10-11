@@ -214,54 +214,24 @@ class CorrectionService {
         };
       }
       try {
-        const { data: currCorr, error: fetchErr } = await supabase
-          .from('attendance_corrections')
-          .select('*')
-          .eq('id', correctionId)
-          .single();
+        // Eksekusi Persetujuan Koreksi & Penerapan Presensi Secara Atomik di Database via RPC
+        const { error: rpcErr } = await supabase.rpc('apply_attendance_correction', {
+          p_correction_id: correctionId,
+        });
 
-        if (fetchErr || !currCorr) {
-          return { success: false, message: 'Data pengajuan koreksi tidak ditemukan.' };
+        if (rpcErr) {
+          return { success: false, message: `Gagal menyetujui koreksi: ${rpcErr.message}` };
         }
 
-        // Anti-self-approval check
-        if (currCorr.requested_by === approverUserId || currCorr.user_id === approverUserId) {
-          return {
-            success: false,
-            message: 'Konflik kepentingan: Pemohon atau aparatur terkait dilarang menyetujui koreksi presensinya sendiri.',
-          };
-        }
-
-        // 1. Update state in attendance_corrections to APPROVED
-        const { data: approvedCorr, error: appErr } = await supabase
+        // Ambil data hasil pembaruan untuk pemetaan objek dan sinkronisasi cache
+        const { data: approvedCorr, error: fetchErr } = await supabase
           .from('attendance_corrections')
-          .update({
-            state: 'APPROVED',
-            approved_by: approverUserId,
-            approved_at: now,
-          })
-          .eq('id', correctionId)
           .select('*, users!attendance_corrections_user_id_fkey(nama, jabatan_id, positions(nama))')
+          .eq('id', correctionId)
           .single();
 
-        if (appErr) {
-          return { success: false, message: `Gagal menyetujui koreksi: ${appErr.message}` };
-        }
-
-        // 2. Apply to attendance_records (trigger automatically verifies approved correction)
-        const { error: recErr } = await supabase
-          .from('attendance_records')
-          .update({
-            check_in_at: approvedCorr.corrected_check_in,
-            check_out_at: approvedCorr.corrected_check_out,
-            status: approvedCorr.corrected_status,
-            correction_state: 'CORRECTED',
-            updated_at: now,
-          })
-          .eq('id', approvedCorr.attendance_record_id);
-
-        if (recErr) {
-          return { success: false, message: `Gagal menerapkan koreksi ke catatan presensi: ${recErr.message}` };
+        if (fetchErr || !approvedCorr) {
+          return { success: false, message: 'Koreksi berhasil diterapkan di database, namun gagal membaca kembali data transaksi.' };
         }
 
         attendanceService.applyCorrection(approvedCorr.attendance_record_id, {
@@ -287,16 +257,16 @@ class CorrectionService {
           reason: approvedCorr.reason,
           requestedByUserId: approvedCorr.requested_by,
           requestedByNama: 'Operator',
-          processedByUserId: approverUserId,
+          processedByUserId: approvedCorr.approved_by || approverUserId,
           processedByNama: approverNama,
-          processedAt: now,
-          appliedAt: now,
-          appliedByUserId: approverUserId,
+          processedAt: approvedCorr.approved_at || now,
+          appliedAt: approvedCorr.applied_at || now,
+          appliedByUserId: approvedCorr.applied_by || approverUserId,
           state: 'APPROVED',
           createdAt: approvedCorr.created_at,
         };
 
-        return { success: true, data: mapped, message: 'Koreksi presensi berhasil disetujui dan diterapkan.' };
+        return { success: true, data: mapped, message: 'Koreksi presensi berhasil disetujui dan diterapkan secara atomik.' };
       } catch (err: any) {
         return { success: false, message: `Gagal menyetujui koreksi: ${err.message || err}` };
       }
@@ -305,6 +275,18 @@ class CorrectionService {
     await simulateNetworkDelay(300);
     const item = this.requests.find((r) => r.id === correctionId);
     if (!item) return { success: false, message: 'Permohonan koreksi tidak ditemukan.' };
+
+    if (item.state !== 'PENDING') {
+      return { success: false, message: `Hanya permohonan berstatus PENDING yang dapat disetujui (Status saat ini: ${item.state}).` };
+    }
+
+    if (item.requestedByUserId === approverUserId || item.userId === approverUserId) {
+      return {
+        success: false,
+        message: 'Konflik kepentingan: Pemohon atau aparatur terkait dilarang menyetujui koreksi presensinya sendiri.',
+      };
+    }
+
     item.state = 'APPROVED';
     item.processedByUserId = approverUserId;
     item.processedByNama = approverNama;

@@ -38,8 +38,8 @@ Keterangan Aksi:
 | **Monitoring Presensi** | R | R | R | R | - |
 | **Koreksi Presensi** | R | R, C, U, A | R | R | - |
 | **Dinas Luar (Pengajuan)** | R, C | R, C | R, C | R, C | R, C (Self) |
-| **Dinas Luar (Verifikasi)**| R, A | R, A | R, A | R, A | - |
-| **Dinas Luar (Approval)** | R, A | R, A | R, A | R, A | - |
+| **Dinas Luar (Verifikasi)**| R, A | R, A | R | R, A | - |
+| **Dinas Luar (Approval)** | R, A | - | R, A | R, A | - |
 | **Dinas Luar (Ratifikasi)**| - | - | **R, A (Eksklusif)**| - | - |
 | **Izin & Sakit (Pengajuan)**| - | R, C (Self) | R, C (Self) | R, C (Self) | R, C (Self) |
 | **Izin & Sakit (Approval)** | R, A | R, A | R, A | R, A | - |

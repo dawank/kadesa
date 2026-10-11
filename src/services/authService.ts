@@ -110,6 +110,20 @@ class AuthService {
 
         if (signInError || !authData.session || !authData.user) {
           const msg = signInError?.message || 'Username atau kata sandi tidak valid. Silakan periksa kembali.';
+          const isRateLimited =
+            (signInError as any)?.status === 429 ||
+            msg.toLowerCase().includes('rate limit') ||
+            msg.toLowerCase().includes('too many requests') ||
+            (signInError as any)?.code === 'over_request_rate_limit';
+
+          if (isRateLimited) {
+            return {
+              success: false,
+              message: 'Batas percobaan masuk terlampaui demi keamanan akun. Silakan tunggu beberapa saat sebelum mencoba kembali.',
+              errorCode: 'RATE_LIMITED',
+            };
+          }
+
           return {
             success: false,
             message: msg.includes('Invalid login credentials')
@@ -489,7 +503,7 @@ class AuthService {
         return role === 'SEKRETARIS_DESA' || role === 'OPERATOR_DESA' || role === 'KEPALA_DESA' || role === 'SUPER_ADMIN';
 
       case 'dl_approve':
-        return role === 'SEKRETARIS_DESA' || role === 'OPERATOR_DESA' || role === 'KEPALA_DESA';
+        return role === 'SEKRETARIS_DESA' || role === 'KEPALA_DESA' || role === 'SUPER_ADMIN';
 
       case 'dl_ratify':
         // STRICT PRD 12.3: Only Kepala Desa can ratify DL

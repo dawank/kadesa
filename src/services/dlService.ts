@@ -176,6 +176,25 @@ class DLService {
       return { success: false, message: 'Tujuan kegiatan dan minimal satu lokasi penugasan wajib diisi' };
     }
 
+    if (requesterUserId !== data.subjectUserId) {
+      const allowedToAssign = ['SUPER_ADMIN', 'OPERATOR_DESA', 'KEPALA_DESA', 'SEKRETARIS_DESA'].includes(requesterUserRole);
+      if (!allowedToAssign) {
+        return {
+          success: false,
+          message: 'Kewenangan ditolak: Hanya Administrator, Operator, Sekdes, atau Kades yang dapat menugaskan aparatur lain.',
+        };
+      }
+    }
+
+    for (const loc of data.locations) {
+      if (typeof loc.latitude !== 'number' || typeof loc.longitude !== 'number' || isNaN(loc.latitude) || isNaN(loc.longitude)) {
+        return { success: false, message: 'Koordinat lokasi tujuan tidak valid' };
+      }
+      if (loc.latitude < -90 || loc.latitude > 90 || loc.longitude < -180 || loc.longitude > 180) {
+        return { success: false, message: `Koordinat geografis lokasi ${loc.namaLokasi} di luar rentang valid.` };
+      }
+    }
+
     const minRadius = await settingsService.getNumberSetting('DL_MIN_RADIUS_METERS', 25);
     const maxRadius = await settingsService.getNumberSetting('DL_MAX_RADIUS_METERS', 500);
 
@@ -199,45 +218,49 @@ class DLService {
       try {
         const id = `dla-${Date.now().toString().slice(-6)}`;
         const nomorSurat = `${Math.floor(100 + Math.random() * 900)}/ST-DL/SKM/${new Date().getMonth() + 1}/${new Date().getFullYear()}`;
-        const { data: newDlRow, error: dlErr } = await supabase
+
+        // Eksekusi Pembuatan Penugasan DL & Seluruh Multi-Lokasi Secara Atomik di Database via RPC
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('create_dl_assignment_with_locations', {
+          p_subject_user_id: data.subjectUserId,
+          p_purpose: data.purpose,
+          p_start_date: data.startDate,
+          p_end_date: data.endDate,
+          p_locations: validatedLocations.map((loc) => ({
+            id: loc.id,
+            namaLokasi: loc.namaLokasi,
+            latitude: loc.latitude,
+            longitude: loc.longitude,
+            radius: loc.radius,
+            alamat: loc.alamat || null,
+          })),
+          p_id: id,
+          p_nomor_surat: nomorSurat,
+        });
+
+        if (rpcErr) {
+          return { success: false, message: `Gagal membuat penugasan DL: ${rpcErr.message}` };
+        }
+
+        const createdId = (rpcRes && (rpcRes as any).id) ? (rpcRes as any).id : id;
+
+        // Ambil data lengkap dengan relasi untuk tampilan UI
+        const { data: fullDlRow, error: fetchErr } = await supabase
           .from('dl_assignments')
-          .insert({
-            id,
-            nomor_surat: nomorSurat,
-            subject_user_id: data.subjectUserId,
-            requester_user_id: requesterUserId,
-            purpose: data.purpose,
-            start_date: data.startDate,
-            end_date: data.endDate,
-            state: 'PENDING',
-          })
           .select(`
             *,
+            dl_locations(*),
             subject:users!dl_assignments_subject_user_id_fkey(nama, jabatan_id, positions(nama)),
             requester:users!dl_assignments_requester_user_id_fkey(nama, role)
           `)
+          .eq('id', createdId)
           .single();
 
-        if (dlErr) {
-          return { success: false, message: `Gagal membuat penugasan DL: ${dlErr.message}` };
+        if (fetchErr || !fullDlRow) {
+          return { success: false, message: 'Penugasan DL berhasil dibuat di database, namun gagal membaca kembali data transaksi.' };
         }
 
-        if (newDlRow) {
-          const locsToInsert = validatedLocations.map((loc) => ({
-            id: loc.id,
-            dl_assignment_id: id,
-            nama_lokasi: loc.namaLokasi,
-            latitude: loc.latitude,
-            longitude: loc.longitude,
-            radius_meters: loc.radius,
-            active: true,
-          }));
-          await supabase.from('dl_locations').insert(locsToInsert);
-          newDlRow.dl_locations = locsToInsert;
-          const mapped = mapDbRowToDLAssignment(newDlRow);
-          return { success: true, data: mapped, message: 'Pengajuan Dinas Luar berhasil dibuat (Menunggu Verifikasi)' };
-        }
-        return { success: false, message: 'Gagal membuat penugasan DL' };
+        const mapped = mapDbRowToDLAssignment(fullDlRow);
+        return { success: true, data: mapped, message: 'Pengajuan Dinas Luar berhasil dibuat secara atomik (Menunggu Verifikasi)' };
       } catch (err: any) {
         return { success: false, message: `Gagal membuat penugasan DL: ${err.message || err}` };
       }
