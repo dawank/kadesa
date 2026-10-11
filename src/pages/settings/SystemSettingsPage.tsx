@@ -619,71 +619,80 @@ export const SystemSettingsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Category Parameters Table */}
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
-        <div className="card-header">
-          <h3 className="card-title">Parameter Konfigurasi Aktif</h3>
-        </div>
+      {/* Category Parameters Table (khusus kategori parameter key-value: GEOFENCE, WORKFLOW, EVIDENCE, SECURITY) */}
+      {activeCategory !== 'WORK_SCHEDULE' && activeCategory !== 'BRANDING' && activeCategory !== 'LETTERHEAD' && (
+        <div className="card" style={{ marginBottom: '1.5rem' }}>
+          <div className="card-header">
+            <h3 className="card-title">Parameter Konfigurasi Aktif</h3>
+          </div>
 
-
-        <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Nama Parameter</th>
-                <th>Nilai Aktif</th>
-                <th>Mulai Berlaku</th>
-                <th>Deskripsi</th>
-                <th style={{ textAlign: 'right' }}>Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredSettings.map((item) => (
-                <tr key={item.id}>
-                  <td><strong>{item.label}</strong></td>
-                  <td>
-                    <span
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: '0.875rem',
-                        fontWeight: 700,
-                        color: 'var(--color-primary-700)',
-                        backgroundColor: 'var(--color-primary-50)',
-                        padding: '0.2rem 0.5rem',
-                        borderRadius: 4,
-                      }}
-                    >
-                      {item.value}
-                    </span>
-                  </td>
-                  <td>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8125rem' }}>
-                      {item.effectiveFrom}
-                    </span>
-                  </td>
-                  <td>
-                    <span style={{ fontSize: '0.8125rem', color: 'var(--color-slate-600)' }}>
-                      {item.description}
-                    </span>
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    {canManage && (
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        style={{ fontSize: '0.75rem' }}
-                        onClick={() => openEditModal(item)}
-                      >
-                        Ubah Nilai
-                      </button>
-                    )}
-                  </td>
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Nama Parameter</th>
+                  <th>Nilai Aktif</th>
+                  <th>Mulai Berlaku</th>
+                  <th>Deskripsi</th>
+                  <th style={{ textAlign: 'right' }}>Aksi</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredSettings.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem 1rem' }}>
+                      Tidak ada parameter konfigurasi aktif dalam kategori ini.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredSettings.map((item) => (
+                    <tr key={item.id}>
+                      <td><strong>{item.label}</strong></td>
+                      <td>
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '0.875rem',
+                            fontWeight: 700,
+                            color: 'var(--color-primary-700)',
+                            backgroundColor: 'var(--color-primary-50)',
+                            padding: '0.2rem 0.5rem',
+                            borderRadius: 4,
+                          }}
+                        >
+                          {item.value}
+                        </span>
+                      </td>
+                      <td>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8125rem' }}>
+                          {item.effectiveFrom}
+                        </span>
+                      </td>
+                      <td>
+                        <span style={{ fontSize: '0.8125rem', color: 'var(--color-slate-600)' }}>
+                          {item.description}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {canManage && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            style={{ fontSize: '0.75rem' }}
+                            onClick={() => openEditModal(item)}
+                          >
+                            Ubah Nilai
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {activeCategory === 'WORK_SCHEDULE' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '1.5rem' }}>

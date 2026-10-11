@@ -81,12 +81,9 @@ export const PresensiRegulerPage: React.FC = () => {
       setWorkEndTime(schInfo.schedule.endTime);
       setLateTolerance(schInfo.schedule.toleranceMinutes);
     } else {
-      const start = await settingsService.getStringSetting('WORK_START_TIME', '07:30');
-      setWorkStartTime(start);
-      const tol = await settingsService.getNumberSetting('LATE_TOLERANCE_MINUTES', 15);
-      setLateTolerance(tol);
-      const end = await settingsService.getStringSetting('WORK_END_TIME', '15:30');
-      setWorkEndTime(end);
+      setWorkStartTime('07:30');
+      setLateTolerance(15);
+      setWorkEndTime('15:30');
     }
 
     const villageRes = await masterService.getVillage();

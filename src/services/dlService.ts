@@ -683,9 +683,12 @@ class DLService {
     // Check early leave for DL checkout before standard shift ends
     let isEarly = false;
     if (type === 'CHECK_OUT') {
-      const workEndTime = await settingsService.getStringSetting('WORK_END_TIME', '15:30');
-      const [endH, endM] = workEndTime.split(':').map(Number);
       const nowTime = new Date();
+      const schInfo = await settingsService.getScheduleForDate(nowTime);
+      const workEndTime = (schInfo.schedule?.endTime && schInfo.schedule.endTime !== '00:00')
+        ? schInfo.schedule.endTime
+        : '15:30';
+      const [endH, endM] = workEndTime.split(':').map(Number);
       const endShift = new Date();
       endShift.setHours(endH, endM, 0, 0);
 

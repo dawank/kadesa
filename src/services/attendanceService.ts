@@ -397,10 +397,10 @@ class AttendanceService {
 
     const effectiveStartTime = (daySchedule?.startTime && daySchedule.startTime !== '00:00')
       ? daySchedule.startTime
-      : (await settingsService.getStringSetting('WORK_START_TIME', '07:30'));
-    const lateTolerance = (daySchedule?.toleranceMinutes != null && daySchedule.toleranceMinutes > 0)
+      : '07:30';
+    const lateTolerance = (daySchedule?.toleranceMinutes != null && daySchedule.toleranceMinutes >= 0)
       ? daySchedule.toleranceMinutes
-      : (await settingsService.getNumberSetting('LATE_TOLERANCE_MINUTES', 15));
+      : 15;
 
     // Extract current hour and minute in the configured timezone
     const timeFormatter = new Intl.DateTimeFormat('en-US', {
@@ -636,7 +636,7 @@ class AttendanceService {
     const isWorkingDay = dayScheduleInfo.isWorkingDay;
     const workEndTime = (daySchedule?.endTime && daySchedule.endTime !== '00:00')
       ? daySchedule.endTime
-      : (await settingsService.getStringSetting('WORK_END_TIME', '15:30'));
+      : '15:30';
     const [endH, endM] = workEndTime.split(':').map(Number);
 
     // Compute current time from authoritative serverTime in configured timezone
