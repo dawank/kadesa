@@ -214,54 +214,25 @@ class CorrectionService {
         };
       }
       try {
-        const { data: currCorr, error: fetchErr } = await supabase
-          .from('attendance_corrections')
-          .select('*')
-          .eq('id', correctionId)
-          .single();
-
-        if (fetchErr || !currCorr) {
-          return { success: false, message: 'Data pengajuan koreksi tidak ditemukan.' };
-        }
-
-        // Anti-self-approval check
-        if (currCorr.requested_by === approverUserId || currCorr.user_id === approverUserId) {
-          return {
-            success: false,
-            message: 'Konflik kepentingan: Pemohon atau aparatur terkait dilarang menyetujui koreksi presensinya sendiri.',
-          };
-        }
-
-        // 1. Update state in attendance_corrections to APPROVED
-        const { data: approvedCorr, error: appErr } = await supabase
-          .from('attendance_corrections')
-          .update({
-            state: 'APPROVED',
-            approved_by: approverUserId,
-            approved_at: now,
-          })
-          .eq('id', correctionId)
-          .select('*, users!attendance_corrections_user_id_fkey(nama, jabatan_id, positions(nama))')
-          .single();
+        const { data: rpcResult, error: appErr } = await supabase.rpc('apply_attendance_correction', {
+          p_correction_id: correctionId,
+        });
 
         if (appErr) {
-          return { success: false, message: `Gagal menyetujui koreksi: ${appErr.message}` };
+          return { success: false, message: `Gagal menyetujui dan menerapkan koreksi: ${appErr.message}` };
+        }
+        if (!rpcResult?.success) {
+          return { success: false, message: 'Database tidak mengonfirmasi penerapan koreksi.' };
         }
 
-        // 2. Apply to attendance_records (trigger automatically verifies approved correction)
-        const { error: recErr } = await supabase
-          .from('attendance_records')
-          .update({
-            check_in_at: approvedCorr.corrected_check_in,
-            check_out_at: approvedCorr.corrected_check_out,
-            status: approvedCorr.corrected_status,
-            correction_state: 'CORRECTED',
-            updated_at: now,
-          })
-          .eq('id', approvedCorr.attendance_record_id);
+        const { data: approvedCorr, error: fetchErr } = await supabase
+          .from('attendance_corrections')
+          .select('*, users!attendance_corrections_user_id_fkey(nama, jabatan_id, positions(nama))')
+          .eq('id', correctionId)
+          .single();
 
-        if (recErr) {
-          return { success: false, message: `Gagal menerapkan koreksi ke catatan presensi: ${recErr.message}` };
+        if (fetchErr || !approvedCorr || !approvedCorr.applied_at || !approvedCorr.applied_by) {
+          return { success: false, message: 'Koreksi belum terkonfirmasi diterapkan oleh database.' };
         }
 
         attendanceService.applyCorrection(approvedCorr.attendance_record_id, {
