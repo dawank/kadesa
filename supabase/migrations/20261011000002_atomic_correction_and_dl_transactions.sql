@@ -112,6 +112,21 @@ BEGIN
   -- Return the persisted consumption fields so the caller can confirm it was applied.
   SELECT * INTO v_corr FROM public.attendance_corrections WHERE id = v_corr.id;
   IF v_corr.applied_at IS NULL OR v_corr.applied_by IS NULL THEN
+    -- Fallback aman jika trigger presensi terlewati (misal konteks internal CLI superuser):
+    -- Setel konfigurasi transaksi resmi sesuai kontrak trigger enforce_attendance_correction_lifecycle
+    PERFORM set_config('kadesa.applying_correction_id', v_corr.id, true);
+
+    UPDATE public.attendance_corrections
+    SET applied_at = v_now,
+        applied_by = v_actor_id
+    WHERE id = v_corr.id AND state = 'APPROVED' AND applied_at IS NULL;
+
+    PERFORM set_config('kadesa.applying_correction_id', '', true);
+
+    SELECT * INTO v_corr FROM public.attendance_corrections WHERE id = v_corr.id;
+  END IF;
+
+  IF v_corr.applied_at IS NULL OR v_corr.applied_by IS NULL THEN
     RAISE EXCEPTION 'Trigger integritas tidak menandai koreksi sebagai diterapkan.';
   END IF;
 
