@@ -11,7 +11,7 @@ import { User } from '../../types/auth';
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser, isLoading, login } = useAuth();
-  const { logo, villageName, loginBackground } = useBranding();
+  const { villageName, loginBackground } = useBranding();
   const [username, setUsername] = useState(IS_DEMO_MODE ? 'operator' : '');
   const [password, setPassword] = useState(IS_DEMO_MODE ? 'password123' : '');
   const [showPassword, setShowPassword] = useState(false);

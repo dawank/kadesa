@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authService } from '../../services/authService';
+import {
+  PASSWORD_PLACEHOLDER,
+  PASSWORD_CONFIRM_MISMATCH_MESSAGE,
+  validatePasswordLength,
+} from '../../types/auth';
 import { Lock, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export const ResetPasswordPage: React.FC = () => {
@@ -14,12 +19,13 @@ export const ResetPasswordPage: React.FC = () => {
     e.preventDefault();
     setErrorMsg(null);
 
-    if (newPassword.length < 8) {
-      setErrorMsg('Kata sandi baru minimal 8 karakter');
+    const val = validatePasswordLength(newPassword, 'Kata sandi baru');
+    if (!val.isValid) {
+      setErrorMsg(val.message!);
       return;
     }
     if (newPassword !== confirmPassword) {
-      setErrorMsg('Konfirmasi kata sandi tidak cocok');
+      setErrorMsg(PASSWORD_CONFIRM_MISMATCH_MESSAGE);
       return;
     }
 
@@ -107,7 +113,7 @@ export const ResetPasswordPage: React.FC = () => {
               id="reset-new-password"
               type="password"
               className="form-input"
-              placeholder="Minimal 8 karakter"
+              placeholder={PASSWORD_PLACEHOLDER}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
             />

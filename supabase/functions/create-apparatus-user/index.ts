@@ -100,9 +100,16 @@ serve(async (req: Request) => {
       }
     }
 
+    if (!password || typeof password !== "string" || password.trim().length < 8) {
+      return new Response(
+        JSON.stringify({ success: false, message: "Password awal wajib diisi minimal 8 karakter." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const cleanUsername = username.trim().toLowerCase();
     const email = cleanUsername.includes("@") ? cleanUsername : `${cleanUsername}@desa.local`;
-    const userPassword = (password && password.trim().length >= 6) ? password.trim() : "password123";
+    const userPassword = password.trim();
 
     // 4. Periksa apakah NIK atau username sudah terdaftar
     const { data: existingUser } = await supabaseAdmin

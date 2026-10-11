@@ -35,7 +35,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
 }) => {
   const { currentUser, hasPermission } = useAuth();
-  const { logo, villageName } = useBranding();
+  const { villageName } = useBranding();
 
   const role = currentUser?.role;
   const mobileOpen = isMobileOpen ?? isOpen;
@@ -168,20 +168,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </NavLink>
 
         {/* Master Data Section - Disembunyikan untuk Role Perangkat Desa */}
-        {role !== 'PERANGKAT_DESA' && hasPermission('view_master_desa') && (
+        {role !== 'PERANGKAT_DESA' && (hasPermission('view_master_aparatur') || hasPermission('view_master_jabatan')) && (
           <>
             <div className="sidebar-section-title">Master Data Desa</div>
-            <NavLink
-              to="/master/desa"
-              className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
-              onClick={handleNavClick}
-              title="Profil Desa"
-              data-tooltip="Profil Desa"
-            >
-              <Building2 size={20} className="sidebar-nav-icon" />
-              <span className="sidebar-nav-text">Profil Desa</span>
-            </NavLink>
-
             {hasPermission('view_master_aparatur') && (
               <NavLink
                 to="/master/aparatur"

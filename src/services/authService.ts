@@ -1,4 +1,4 @@
-import { User, UserRole, PermissionAction, AuthSession } from '../types/auth';
+import { User, UserRole, PermissionAction, AuthSession, validatePasswordLength, formatAuthPasswordError } from '../types/auth';
 import { mockUsers } from '../mock/mockData';
 import { ApiResponse, simulateNetworkDelay, IS_DEMO_MODE } from './apiClient';
 import { supabase, isSupabaseConfigured, supabaseUrl, supabaseAnonKey } from './supabaseClient';
@@ -393,8 +393,9 @@ class AuthService {
   }
 
   async changePassword(_oldPass: string, newPass: string): Promise<ApiResponse<boolean>> {
-    if (newPass.length < 8) {
-      return { success: false, message: 'Kata sandi minimal 8 karakter' };
+    const val = validatePasswordLength(newPass, 'Kata sandi');
+    if (!val.isValid) {
+      return { success: false, message: val.message! };
     }
     if (!IS_DEMO_MODE) {
       if (!isSupabaseConfigured()) {
@@ -407,11 +408,11 @@ class AuthService {
       try {
         const { error } = await supabase.auth.updateUser({ password: newPass });
         if (error) {
-          return { success: false, message: `Gagal mengubah kata sandi: ${error.message}` };
+          return { success: false, message: `Gagal mengubah kata sandi: ${formatAuthPasswordError(error.message)}` };
         }
         return { success: true, data: true, message: 'Kata sandi berhasil diubah' };
       } catch (err: any) {
-        return { success: false, message: `Gagal mengubah kata sandi: ${err.message}` };
+        return { success: false, message: `Gagal mengubah kata sandi: ${formatAuthPasswordError(err.message)}` };
       }
     }
     await simulateNetworkDelay(200);
@@ -432,8 +433,9 @@ class AuthService {
 
   async resetPassword(_token: string, newPass: string): Promise<ApiResponse<boolean>> {
     await simulateNetworkDelay(400);
-    if (newPass.length < 8) {
-      return { success: false, message: 'Kata sandi baru minimal 8 karakter' };
+    const val = validatePasswordLength(newPass, 'Kata sandi baru');
+    if (!val.isValid) {
+      return { success: false, message: val.message! };
     }
     return { success: true, data: true, message: 'Kata sandi berhasil direset. Silakan login kembali.' };
   }

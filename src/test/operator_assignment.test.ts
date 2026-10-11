@@ -136,7 +136,8 @@ describe('Operator Desa Role Assignment & Authorization Tests', () => {
         active: true,
         effectiveFrom: '2025-01-01',
       },
-      'OPERATOR_DESA'
+      'OPERATOR_DESA',
+      'PasswordKuat2026!'
     );
     expect(createOperatorRes.success).toBe(false);
     expect(createOperatorRes.message).toContain('Operator tidak memiliki wewenang untuk membuat akun baru dengan peran Operator Desa');
@@ -156,7 +157,8 @@ describe('Operator Desa Role Assignment & Authorization Tests', () => {
         active: true,
         effectiveFrom: '2025-01-01',
       },
-      'OPERATOR_DESA'
+      'OPERATOR_DESA',
+      'PasswordKuat2026!'
     );
     expect(createSuperAdminRes.success).toBe(false);
     expect(createSuperAdminRes.message).toContain('Operator tidak memiliki wewenang untuk membuat akun baru dengan peran Super Admin');

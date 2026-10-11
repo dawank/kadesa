@@ -59,3 +59,5 @@ export type PermissionAction =
   | 'manage_settings'
   | 'view_audit_logs'
   | 'view_security_events';
+
+export * from '../utils/passwordPolicy';

@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { masterService } from '../../services/masterService';
-import { User, UserRole } from '../../types/auth';
+import {
+  User,
+  UserRole,
+  PASSWORD_PLACEHOLDER,
+  PASSWORD_INITIAL_PLACEHOLDER,
+  PASSWORD_CONFIRM_MISMATCH_MESSAGE,
+  validatePasswordLength,
+} from '../../types/auth';
 import { Position } from '../../types/master';
 import { Modal } from '../../components/common/Modal';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
@@ -53,7 +60,7 @@ export const MasterAparaturPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   // Initial Password for New User
-  const [initialPassword, setInitialPassword] = useState('password123');
+  const [initialPassword, setInitialPassword] = useState('');
   const [showInitialPassword, setShowInitialPassword] = useState(false);
 
   // Reset Password State
@@ -101,7 +108,7 @@ export const MasterAparaturPage: React.FC = () => {
 
   const openAddModal = () => {
     setEditingUser(null);
-    setInitialPassword('password123');
+    setInitialPassword('');
     setShowInitialPassword(false);
     setFormData({
       nama: '',
@@ -169,8 +176,9 @@ export const MasterAparaturPage: React.FC = () => {
 
     // Password validation for new apparatus
     if (!editingUser) {
-      if (!initialPassword || initialPassword.trim().length < 6) {
-        showToast('Password awal wajib diisi minimal 6 karakter', 'warning');
+      const val = validatePasswordLength(initialPassword, 'Password awal');
+      if (!val.isValid) {
+        showToast(val.message!, 'warning');
         return;
       }
     }
@@ -231,13 +239,14 @@ export const MasterAparaturPage: React.FC = () => {
     e.preventDefault();
     if (!resetPasswordUser) return;
 
-    if (!newPassword || newPassword.trim().length < 6) {
-      showToast('Kata sandi baru minimal 6 karakter', 'warning');
+    const val = validatePasswordLength(newPassword, 'Kata sandi baru');
+    if (!val.isValid) {
+      showToast(val.message!, 'warning');
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      showToast('Konfirmasi kata sandi tidak cocok', 'warning');
+      showToast(PASSWORD_CONFIRM_MISMATCH_MESSAGE, 'warning');
       return;
     }
 
@@ -741,7 +750,7 @@ export const MasterAparaturPage: React.FC = () => {
                 <input
                   type={showInitialPassword ? 'text' : 'password'}
                   className="form-input"
-                  placeholder="Minimal 6 karakter (default: password123)"
+                  placeholder={PASSWORD_INITIAL_PLACEHOLDER}
                   value={initialPassword}
                   onChange={(e) => setInitialPassword(e.target.value)}
                   style={{ paddingRight: '2.5rem' }}
@@ -865,7 +874,7 @@ export const MasterAparaturPage: React.FC = () => {
                 <input
                   type={showNewPassword ? 'text' : 'password'}
                   className="form-input"
-                  placeholder="Minimal 6 karakter"
+                  placeholder={PASSWORD_PLACEHOLDER}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   style={{ paddingRight: '2.5rem' }}

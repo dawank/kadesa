@@ -1,5 +1,5 @@
 import { Village, Position } from '../types/master';
-import { User } from '../types/auth';
+import { User, validatePasswordLength, formatAuthPasswordError } from '../types/auth';
 import { mockVillage, mockPositions, mockUsers } from '../mock/mockData';
 import { ApiResponse, simulateNetworkDelay, IS_DEMO_MODE } from './apiClient';
 import { authService } from './authService';
@@ -445,11 +445,6 @@ class MasterService {
       return { success: false, message: 'Mohon lengkapi seluruh field wajib (Nama, NIK, No. WhatsApp, Username)' };
     }
 
-    // Password validation if provided
-    if (initialPassword && initialPassword.trim().length < 6) {
-      return { success: false, message: 'Password awal minimal 6 karakter.' };
-    }
-
     // STRICT: Operator cannot create accounts with OPERATOR_DESA or SUPER_ADMIN role
     if (actorRole === 'OPERATOR_DESA') {
       if (data.role === 'OPERATOR_DESA') {
@@ -466,6 +461,13 @@ class MasterService {
       }
     }
 
+    // Password validation - initialPassword wajib dan minimal 8 karakter
+    const val = validatePasswordLength(initialPassword || '', 'Password awal');
+    if (!val.isValid) {
+      return { success: false, message: val.message! };
+    }
+    const cleanPassword = initialPassword!.trim();
+
     // Check duplicate NIK
     if (this.apparatusList.some(a => a.nik === data.nik)) {
       return { success: false, message: 'NIK sudah terdaftar dalam sistem' };
@@ -480,7 +482,7 @@ class MasterService {
       try {
         const payload = {
           username: data.username,
-          password: initialPassword || 'password123',
+          password: cleanPassword,
           nama: data.nama,
           nik: data.nik,
           nipd: data.nipd || null,
@@ -525,8 +527,7 @@ class MasterService {
           this.apparatusList.push(u);
 
           // Register user into in-memory auth for mock continuity
-          const pass = initialPassword && initialPassword.trim() ? initialPassword.trim() : 'password123';
-          authService.registerUser(u, pass);
+          authService.registerUser(u, cleanPassword);
 
           // Record audit log
           await auditService.recordAuditEvent({
@@ -556,8 +557,7 @@ class MasterService {
     this.apparatusList.push(newUser);
 
     // Register user and credentials with authService
-    const pass = initialPassword && initialPassword.trim() ? initialPassword.trim() : 'password123';
-    authService.registerUser(newUser, pass);
+    authService.registerUser(newUser, cleanPassword);
 
     await auditService.recordAuditEvent({
       actorUserId: 'system',
@@ -580,6 +580,14 @@ class MasterService {
     actorId?: string,
     actorNama?: string
   ): Promise<ApiResponse<boolean>> {
+    const val = validatePasswordLength(newPassword, 'Kata sandi baru');
+    if (!val.isValid) {
+      return {
+        success: false,
+        message: val.message!,
+      };
+    }
+
     let targetUser = this.apparatusList.find((a) => a.id === targetUserId);
     if (!targetUser && !IS_DEMO_MODE && isSupabaseConfigured()) {
       try {
@@ -627,13 +635,6 @@ class MasterService {
       };
     }
 
-    if (!newPassword || newPassword.trim().length < 6) {
-      return {
-        success: false,
-        message: 'Kata sandi baru minimal 6 karakter.',
-      };
-    }
-
     // Jika terhubung ke Supabase Cloud (Production), jalankan melalui Edge Function tepercaya
     if (!IS_DEMO_MODE && isSupabaseConfigured()) {
       try {
@@ -659,7 +660,7 @@ class MasterService {
           }
           return {
             success: false,
-            message: errDetail,
+            message: formatAuthPasswordError(errDetail),
           };
         }
 

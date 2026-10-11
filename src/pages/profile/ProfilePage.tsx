@@ -3,6 +3,12 @@ import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/authService';
 import { useToast } from '../../context/ToastContext';
 import {
+  MIN_PASSWORD_LENGTH,
+  PASSWORD_PLACEHOLDER,
+  validatePasswordLength,
+  PASSWORD_CONFIRM_MISMATCH_MESSAGE,
+} from '../../types/auth';
+import {
   User,
   Lock,
   Phone,
@@ -97,12 +103,13 @@ export const ProfilePage: React.FC = () => {
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPassword.length < 8) {
-      showToast('Kata sandi baru minimal 8 karakter', 'warning');
+    const val = validatePasswordLength(newPassword, 'Kata sandi baru');
+    if (!val.isValid) {
+      showToast(val.message!, 'warning');
       return;
     }
     if (newPassword !== confirmPassword) {
-      showToast('Konfirmasi kata sandi tidak cocok', 'warning');
+      showToast(PASSWORD_CONFIRM_MISMATCH_MESSAGE, 'warning');
       return;
     }
 
@@ -283,7 +290,7 @@ export const ProfilePage: React.FC = () => {
           </h3>
 
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-            Pastikan kata sandi baru memiliki minimal 8 karakter dan kombinasi huruf serta angka demi keamanan data presensi.
+            Pastikan kata sandi baru memiliki minimal {MIN_PASSWORD_LENGTH} karakter dan kombinasi huruf serta angka demi keamanan data presensi.
           </p>
 
           <form onSubmit={handleChangePassword}>
@@ -328,7 +335,7 @@ export const ProfilePage: React.FC = () => {
                 <input
                   type={showNewPassword ? 'text' : 'password'}
                   className="form-input"
-                  placeholder="Minimal 8 karakter"
+                  placeholder={PASSWORD_PLACEHOLDER}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   style={{ paddingRight: '2.5rem' }}

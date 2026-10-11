@@ -78,9 +78,9 @@ serve(async (req: Request) => {
       );
     }
 
-    if (typeof newPassword !== "string" || newPassword.trim().length < 6) {
+    if (typeof newPassword !== "string" || newPassword.trim().length < 8) {
       return new Response(
-        JSON.stringify({ success: false, message: "Kata sandi baru minimal 6 karakter." }),
+        JSON.stringify({ success: false, message: "Kata sandi baru minimal 8 karakter." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

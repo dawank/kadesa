@@ -14,7 +14,7 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarCollapsed = false }) => {
   const { currentUser, logout } = useAuth();
-  const { logo, villageName } = useBranding();
+  const { villageName } = useBranding();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
