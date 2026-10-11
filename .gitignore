@@ -32,5 +32,6 @@ dist-ssr
 
 .vercel
 .env*
+!.env.example
 scratch/
 supabase/.temp/
