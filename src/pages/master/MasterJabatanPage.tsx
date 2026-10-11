@@ -10,8 +10,8 @@ export const MasterJabatanPage: React.FC = () => {
   const { hasPermission } = useAuth();
   const { showToast } = useToast();
 
-  const [positions, setPositions] = useState<Position[]>(() => masterService.getCachedPositions());
-  const [isLoading, setIsLoading] = useState(positions.length === 0);
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
   const [posName, setPosName] = useState('');
@@ -92,7 +92,7 @@ export const MasterJabatanPage: React.FC = () => {
       <div className="page-header">
         <div className="page-title-group">
           <h1>Master Data Jabatan Organisasi</h1>
-          <p>Daftar nomenklatur jabatan aparatur pemerintah desa Sukamaju</p>
+          <p>Daftar nomenklatur jabatan aparatur pemerintah desa</p>
         </div>
         {canManage && (
           <div className="page-actions">

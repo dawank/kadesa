@@ -6,9 +6,41 @@ import { LetterheadConfig, DEFAULT_LETTERHEAD_CONFIG } from '../types/settings';
 export const DEFAULT_VILLAGE_LOGO = '/logo-kadesa.png';
 export const DEFAULT_LOGIN_BACKGROUND = 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=1920&q=80';
 
+export interface BrandingVillageInfo {
+  nama: string;
+  kecamatan: string;
+  kabupaten: string;
+  provinsi: string;
+  alamat?: string;
+  kodePos?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+export const formatLocationSubtitle = (kec?: string, kab?: string, prov?: string): string => {
+  const parts: string[] = [];
+  if (kec && kec.trim()) {
+    const cleanKec = kec.trim();
+    parts.push(cleanKec.toLowerCase().startsWith('kec') ? cleanKec : `Kec. ${cleanKec}`);
+  }
+  if (kab && kab.trim()) {
+    const cleanKab = kab.trim();
+    parts.push(cleanKab.toLowerCase().startsWith('kab') ? cleanKab : `Kab. ${cleanKab}`);
+  }
+  if (prov && prov.trim()) {
+    parts.push(prov.trim());
+  }
+  return parts.join(', ');
+};
+
 interface BrandingContextType {
   logo: string;
   villageName: string;
+  kecamatan: string;
+  kabupaten: string;
+  provinsi: string;
+  locationSubtitle: string;
+  village: BrandingVillageInfo | null;
   loginBackground: string;
   letterheadConfig: LetterheadConfig;
   updateVillageLogo: (newLogo: string) => Promise<boolean>;
@@ -30,7 +62,48 @@ export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return DEFAULT_VILLAGE_LOGO;
   });
 
-  const [villageName, setVillageName] = useState<string>('Desa Sukamaju');
+  const [villageName, setVillageName] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('kadesa_village_name') || '';
+    }
+    return '';
+  });
+
+  const [kecamatan, setKecamatan] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('kadesa_village_kecamatan') || '';
+    }
+    return '';
+  });
+
+  const [kabupaten, setKabupaten] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('kadesa_village_kabupaten') || '';
+    }
+    return '';
+  });
+
+  const [provinsi, setProvinsi] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('kadesa_village_provinsi') || '';
+    }
+    return '';
+  });
+
+  const [village, setVillage] = useState<BrandingVillageInfo | null>(() => {
+    if (typeof window !== 'undefined') {
+      const name = localStorage.getItem('kadesa_village_name');
+      if (name) {
+        return {
+          nama: name,
+          kecamatan: localStorage.getItem('kadesa_village_kecamatan') || '',
+          kabupaten: localStorage.getItem('kadesa_village_kabupaten') || '',
+          provinsi: localStorage.getItem('kadesa_village_provinsi') || '',
+        };
+      }
+    }
+    return null;
+  });
 
   const [loginBackground, setLoginBackground] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -51,18 +124,44 @@ export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return DEFAULT_LETTERHEAD_CONFIG;
   });
 
+  const locationSubtitle = formatLocationSubtitle(kecamatan, kabupaten, provinsi);
+
   const refreshBranding = async () => {
     try {
       const vRes = await masterService.getVillage();
       if (vRes.data) {
-        if (vRes.data.logo) {
-          setLogo(vRes.data.logo);
+        const v = vRes.data;
+        if (v.logo) {
+          setLogo(v.logo);
           if (typeof window !== 'undefined') {
-            localStorage.setItem('kadesa_village_logo', vRes.data.logo);
+            localStorage.setItem('kadesa_village_logo', v.logo);
           }
         }
-        if (vRes.data.nama) {
-          setVillageName(vRes.data.nama);
+        const name = v.nama || '';
+        const kec = v.kecamatan || '';
+        const kab = v.kabupaten || '';
+        const prov = v.provinsi || '';
+
+        setVillageName(name);
+        setKecamatan(kec);
+        setKabupaten(kab);
+        setProvinsi(prov);
+        setVillage({
+          nama: name,
+          kecamatan: kec,
+          kabupaten: kab,
+          provinsi: prov,
+          alamat: v.alamat,
+          kodePos: v.kodePos,
+          latitude: v.latitude,
+          longitude: v.longitude,
+        });
+
+        if (typeof window !== 'undefined') {
+          if (name) localStorage.setItem('kadesa_village_name', name);
+          if (kec) localStorage.setItem('kadesa_village_kecamatan', kec);
+          if (kab) localStorage.setItem('kadesa_village_kabupaten', kab);
+          if (prov) localStorage.setItem('kadesa_village_provinsi', prov);
         }
       }
 
@@ -85,10 +184,28 @@ export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     const handleBrandingChanged = (e: Event) => {
       const customEvent = e as CustomEvent<{
+        village?: any;
         logo?: string;
         loginBackground?: string;
         letterheadConfig?: LetterheadConfig;
       }>;
+      if (customEvent.detail?.village) {
+        const v = customEvent.detail.village;
+        if (v.nama !== undefined) setVillageName(v.nama);
+        if (v.kecamatan !== undefined) setKecamatan(v.kecamatan);
+        if (v.kabupaten !== undefined) setKabupaten(v.kabupaten);
+        if (v.provinsi !== undefined) setProvinsi(v.provinsi);
+        setVillage({
+          nama: v.nama || '',
+          kecamatan: v.kecamatan || '',
+          kabupaten: v.kabupaten || '',
+          provinsi: v.provinsi || '',
+          alamat: v.alamat,
+          kodePos: v.kodePos,
+          latitude: v.latitude,
+          longitude: v.longitude,
+        });
+      }
       if (customEvent.detail?.logo) {
         setLogo(customEvent.detail.logo);
       }
@@ -169,6 +286,11 @@ export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       value={{
         logo,
         villageName,
+        kecamatan,
+        kabupaten,
+        provinsi,
+        locationSubtitle,
+        village,
         loginBackground,
         letterheadConfig,
         updateVillageLogo: handleUpdateLogo,
@@ -188,10 +310,18 @@ export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 export const useBranding = (): BrandingContextType => {
   const context = useContext(BrandingContext);
   if (!context) {
-    // Graceful fallback if used outside provider
+    const fallbackName = (typeof window !== 'undefined' && localStorage.getItem('kadesa_village_name')) || '';
+    const fallbackKec = (typeof window !== 'undefined' && localStorage.getItem('kadesa_village_kecamatan')) || '';
+    const fallbackKab = (typeof window !== 'undefined' && localStorage.getItem('kadesa_village_kabupaten')) || '';
+    const fallbackProv = (typeof window !== 'undefined' && localStorage.getItem('kadesa_village_provinsi')) || '';
     return {
       logo: (typeof window !== 'undefined' && localStorage.getItem('kadesa_village_logo')) || DEFAULT_VILLAGE_LOGO,
-      villageName: 'Desa Sukamaju',
+      villageName: fallbackName,
+      kecamatan: fallbackKec,
+      kabupaten: fallbackKab,
+      provinsi: fallbackProv,
+      locationSubtitle: formatLocationSubtitle(fallbackKec, fallbackKab, fallbackProv),
+      village: fallbackName ? { nama: fallbackName, kecamatan: fallbackKec, kabupaten: fallbackKab, provinsi: fallbackProv } : null,
       loginBackground: (typeof window !== 'undefined' && localStorage.getItem('kadesa_login_bg')) || DEFAULT_LOGIN_BACKGROUND,
       letterheadConfig: DEFAULT_LETTERHEAD_CONFIG,
       updateVillageLogo: async () => false,

@@ -1,10 +1,16 @@
 import { NotificationItem, NotificationType } from '../types/notification';
-import { mockNotifications } from '../mock/mockData';
 import { ApiResponse, simulateNetworkDelay, IS_DEMO_MODE } from './apiClient';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 
 class NotificationService {
-  private notifications: NotificationItem[] = [...mockNotifications];
+  private notifications: NotificationItem[] = [];
+
+  /**
+   * Khusus isolasi unit test offline
+   */
+  seedTestFixtures(fixtures: { notifications?: NotificationItem[] }): void {
+    if (fixtures.notifications) this.notifications = [...fixtures.notifications];
+  }
 
   async getNotifications(userId?: string): Promise<ApiResponse<NotificationItem[]>> {
     if (!IS_DEMO_MODE) {

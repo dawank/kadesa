@@ -14,7 +14,7 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarCollapsed = false }) => {
   const { currentUser, logout } = useAuth();
-  const { villageName } = useBranding();
+  const { villageName, locationSubtitle, logo } = useBranding();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -51,20 +51,22 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarCollap
             <Menu size={20} />
           </button>
           <img
-            src="/logo-kadesa.png"
+            src={logo || '/logo-kadesa.png'}
             alt="Logo Aplikasi KADESA"
             style={{ width: 28, height: 28, objectFit: 'contain', borderRadius: 4, flexShrink: 0 }}
           />
           <div className="topbar-brand-wrap">
             <span className="topbar-brand-title desktop-only-text">
-              Pemerintah {villageName}
+              {villageName ? (villageName.toLowerCase().startsWith('desa') ? `Pemerintah ${villageName}` : `Pemerintah Desa ${villageName}`) : 'Pemerintah Desa'}
             </span>
             <span className="topbar-brand-title mobile-only-text">
-              Pemdes {villageName.replace('Desa ', '')}
+              {villageName ? `Pemdes ${villageName.replace(/^desa\s+/i, '')}` : 'Pemdes'}
             </span>
-            <span className="topbar-location-subtitle" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              Kec. Cibinong, Kab. Bogor, Jawa Barat
-            </span>
+            {locationSubtitle ? (
+              <span className="topbar-location-subtitle" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {locationSubtitle}
+              </span>
+            ) : null}
           </div>
         </div>
 

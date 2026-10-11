@@ -1,12 +1,18 @@
 import { CorrectionRequest } from '../types/correction';
 import { DailyAttendanceStatus } from '../types/attendance';
-import { mockCorrectionRequests } from '../mock/mockData';
 import { ApiResponse, simulateNetworkDelay, IS_DEMO_MODE } from './apiClient';
 import { attendanceService } from './attendanceService';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 
 class CorrectionService {
-  private requests: CorrectionRequest[] = [...mockCorrectionRequests];
+  private requests: CorrectionRequest[] = [];
+
+  /**
+   * Khusus isolasi unit test offline
+   */
+  seedTestFixtures(fixtures: { requests?: CorrectionRequest[] }): void {
+    if (fixtures.requests) this.requests = [...fixtures.requests];
+  }
 
   async getCorrections(): Promise<ApiResponse<CorrectionRequest[]>> {
     if (!IS_DEMO_MODE) {

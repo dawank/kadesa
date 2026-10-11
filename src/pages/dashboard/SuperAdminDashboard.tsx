@@ -5,6 +5,7 @@ import { masterService } from '../../services/masterService';
 import { checkDatabaseConnection } from '../../services/supabaseClient';
 import { SecurityEventItem } from '../../types/audit';
 import { Link } from 'react-router-dom';
+import { useBranding } from '../../context/BrandingContext';
 import {
   ShieldCheck,
   Server,
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react';
 
 export const SuperAdminDashboard: React.FC = () => {
+  const { villageName } = useBranding();
   const [securityEvents, setSecurityEvents] = useState<SecurityEventItem[]>([]);
   const [apparatusCount, setApparatusCount] = useState<number>(0);
   const [settingsCount, setSettingsCount] = useState<number>(0);
@@ -71,7 +73,7 @@ export const SuperAdminDashboard: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
               <Server size={18} color="#34d399" />
               <strong style={{ fontSize: '0.9375rem', color: '#f8fafc' }}>
-                Arsitektur Deployment: 1 Deployment = 1 Desa (Desa Sukamaju)
+                Arsitektur Deployment: 1 Deployment = 1 Desa ({villageName || 'Desa'})
               </strong>
             </div>
             <p style={{ color: '#94a3b8', fontSize: '0.8125rem' }}>

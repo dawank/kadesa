@@ -3,7 +3,6 @@ import {
   GeofenceCheckParams,
   GeofenceCheckResult,
 } from '../types/attendance';
-import { mockAttendanceRecords, mockVillage } from '../mock/mockData';
 import { ApiResponse, simulateNetworkDelay, IS_DEMO_MODE } from './apiClient';
 import { settingsService } from './settingsService';
 import { masterService } from './masterService';
@@ -70,8 +69,15 @@ export function calculateHaversineDistanceMeters(
 }
 
 class AttendanceService {
-  private records: AttendanceRecord[] = [...mockAttendanceRecords];
+  private records: AttendanceRecord[] = [];
   private mockServerTime: Date | null = null;
+
+  /**
+   * Khusus isolasi unit test offline
+   */
+  seedTestFixtures(fixtures: { records?: AttendanceRecord[] }): void {
+    if (fixtures.records) this.records = [...fixtures.records];
+  }
 
   // Official Server Clock (as per PRD Section 1 & 46: Official time comes from server)
   getServerTime(): Date {
@@ -336,6 +342,64 @@ class AttendanceService {
         };
       }
 
+      if (!IS_DEMO_MODE) {
+        if (!isSupabaseConfigured()) {
+          return {
+            success: false,
+            message: 'Konfigurasi Supabase belum terpasang di environment.',
+            errorCode: 'SUPABASE_NOT_CONFIGURED',
+          };
+        }
+        try {
+          const { data: existingDb } = await supabase
+            .from('attendance_records')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('attendance_date', today)
+            .maybeSingle();
+
+          if (existingDb && (existingDb.check_in_at || existingDb.check_out_at)) {
+            return {
+              success: false,
+              message: 'Presensi Check-In hari ini sudah tercatat atau sudah Check-Out. Tidak dapat melakukan Check-In kembali.',
+              errorCode: 'DUPLICATE_CHECKIN',
+            };
+          }
+
+          const id = `att-${Date.now().toString().slice(-5)}`;
+          const { data: inserted, error: insErr } = await supabase
+            .from('attendance_records')
+            .insert({
+              id,
+              user_id: userId,
+              attendance_date: today,
+              type: 'DINAS_LUAR',
+              check_in_at: serverTimestamp,
+              check_in_latitude: coords.latitude,
+              check_in_longitude: coords.longitude,
+              check_in_distance_meters: Math.round(coords.accuracy),
+              check_in_selfie_url: userFoto,
+              status: 'DINAS_LUAR',
+              dl_assignment_id: dlAssignmentId,
+              created_at: serverTimestamp,
+              updated_at: serverTimestamp,
+            })
+            .select('*, users(nama, foto_reference, jabatan_id, positions(nama))')
+            .single();
+
+          if (insErr) {
+            return { success: false, message: `Gagal mencatat presensi Dinas Luar: ${insErr.message}` };
+          }
+          if (inserted) {
+            const mapped = mapDbRecordToAttendanceRecord(inserted);
+            mapped.statusReason = 'Presensi Dinas Luar terverifikasi penugasan resmi';
+            return { success: true, data: mapped, message: 'Presensi Dinas Luar berhasil dicatat.' };
+          }
+        } catch (err: any) {
+          return { success: false, message: `Gagal mencatat presensi: ${err.message}` };
+        }
+      }
+
       const newRecord: AttendanceRecord = {
         id: `att-${Date.now().toString().slice(-5)}`,
         userId,
@@ -392,8 +456,8 @@ class AttendanceService {
 
     // Geofence check against village office
     const vRes = await masterService.getVillage();
-    const villageLat = vRes.data?.latitude ?? (IS_DEMO_MODE ? mockVillage.latitude : undefined);
-    const villageLng = vRes.data?.longitude ?? (IS_DEMO_MODE ? mockVillage.longitude : undefined);
+    const villageLat = vRes.data?.latitude;
+    const villageLng = vRes.data?.longitude;
 
     if (villageLat == null || villageLng == null) {
       return {
@@ -640,8 +704,8 @@ class AttendanceService {
     // Geofence check (hanya untuk REGULAR, DINAS_LUAR dikecualikan dari geofence kantor desa)
     if (!isDinasLuar) {
       const vRes = await masterService.getVillage();
-      const villageLat = vRes.data?.latitude ?? (IS_DEMO_MODE ? mockVillage.latitude : undefined);
-      const villageLng = vRes.data?.longitude ?? (IS_DEMO_MODE ? mockVillage.longitude : undefined);
+      const villageLat = vRes.data?.latitude;
+      const villageLng = vRes.data?.longitude;
 
       if (villageLat == null || villageLng == null) {
         return {

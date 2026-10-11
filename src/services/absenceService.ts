@@ -6,13 +6,20 @@ import {
   LeaveType,
   LeaveState,
 } from '../types/absence';
-import { mockAbsenceRequests, mockLeaveRequests } from '../mock/mockData';
 import { ApiResponse, simulateNetworkDelay, IS_DEMO_MODE } from './apiClient';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 
 class AbsenceService {
-  private absences: AbsenceRequest[] = [...mockAbsenceRequests];
-  private leaves: LeaveRequest[] = [...mockLeaveRequests];
+  private absences: AbsenceRequest[] = [];
+  private leaves: LeaveRequest[] = [];
+
+  /**
+   * Khusus isolasi unit test offline
+   */
+  seedTestFixtures(fixtures: { absences?: AbsenceRequest[]; leaves?: LeaveRequest[] }): void {
+    if (fixtures.absences) this.absences = [...fixtures.absences];
+    if (fixtures.leaves) this.leaves = [...fixtures.leaves];
+  }
 
   // --- IZIN & SAKIT ---
   async getAbsences(userId?: string, state?: AbsenceState | 'ALL'): Promise<ApiResponse<AbsenceRequest[]>> {

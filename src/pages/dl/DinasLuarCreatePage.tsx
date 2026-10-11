@@ -28,9 +28,9 @@ export const DinasLuarCreatePage: React.FC = () => {
 
   const [locations, setLocations] = useState<LocationInput[]>([
     {
-      namaLokasi: 'Kantor Kecamatan Cibinong',
-      latitude: -6.495,
-      longitude: 106.852,
+      namaLokasi: '',
+      latitude: -6.48,
+      longitude: 106.84,
       radius: 100,
     },
   ]);
@@ -40,6 +40,18 @@ export const DinasLuarCreatePage: React.FC = () => {
   const canAssignOthers = hasPermission('dl_assign');
 
   useEffect(() => {
+    masterService.getVillage().then((vRes) => {
+      if (vRes.data?.latitude && vRes.data?.longitude) {
+        setLocations((prev) =>
+          prev.map((l, idx) =>
+            idx === 0 && !l.namaLokasi
+              ? { ...l, latitude: vRes.data!.latitude, longitude: vRes.data!.longitude }
+              : l
+          )
+        );
+      }
+    });
+
     masterService.getApparatusList().then((res) => {
       if (res.data) {
         setApparatusList(res.data.filter((u) => u.active));

@@ -4,7 +4,6 @@ import {
   DLLocation,
   DLEvidence,
 } from '../types/dl';
-import { mockDLAssignments } from '../mock/mockData';
 import { ApiResponse, simulateNetworkDelay, IS_DEMO_MODE } from './apiClient';
 import { calculateHaversineDistanceMeters } from './attendanceService';
 import { settingsService } from './settingsService';
@@ -64,7 +63,14 @@ export function mapDbRowToDLAssignment(row: any): DLAssignment {
 }
 
 class DLService {
-  private assignments: DLAssignment[] = [...mockDLAssignments];
+  private assignments: DLAssignment[] = [];
+
+  /**
+   * Khusus isolasi unit test offline
+   */
+  seedTestFixtures(fixtures: { assignments?: DLAssignment[] }): void {
+    if (fixtures.assignments) this.assignments = [...fixtures.assignments];
+  }
 
   async getAssignments(status?: DLState | 'ALL', userId?: string): Promise<ApiResponse<DLAssignment[]>> {
     if (!IS_DEMO_MODE) {
@@ -815,8 +821,8 @@ class DLService {
     // Check-out may also be done at the village office (PRD Section 14.2)
     if (type === 'CHECK_OUT' && !isInsideAnyLocation) {
       const vRes = await masterService.getVillage();
-      const vLat = vRes.data?.latitude ?? (IS_DEMO_MODE ? -6.4828 : null);
-      const vLng = vRes.data?.longitude ?? (IS_DEMO_MODE ? 106.8572 : null);
+      const vLat = vRes.data?.latitude ?? null;
+      const vLng = vRes.data?.longitude ?? null;
       const vRad = await settingsService.getNumberSetting('GEOFENCE_RADIUS_METERS', 100);
       if (vLat != null && vLng != null) {
         const officeDist = calculateHaversineDistanceMeters(

@@ -28,7 +28,7 @@ export const PresensiRegulerPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Settings
-  const [officeCoords, setOfficeCoords] = useState<{ lat: number; lng: number }>({ lat: -6.4828, lng: 106.8436 });
+  const [officeCoords, setOfficeCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [allowedRadius, setAllowedRadius] = useState<number>(100);
   const [workStartTime, setWorkStartTime] = useState<string>('07:30');
   const [lateTolerance, setLateTolerance] = useState<number>(15);
@@ -45,11 +45,7 @@ export const PresensiRegulerPage: React.FC = () => {
   } | null>(null);
 
   // Device Geolocation state
-  const [currentCoords, setCurrentCoords] = useState<{ lat: number; lng: number; accuracy: number }>({
-    lat: -6.4828,
-    lng: 106.8436,
-    accuracy: 10,
-  });
+  const [currentCoords, setCurrentCoords] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [earlyLeaveReason, setEarlyLeaveReason] = useState<string>('');
 
@@ -87,7 +83,7 @@ export const PresensiRegulerPage: React.FC = () => {
     }
 
     const villageRes = await masterService.getVillage();
-    if (villageRes.data) {
+    if (villageRes.data && villageRes.data.latitude !== undefined && villageRes.data.longitude !== undefined) {
       setOfficeCoords({ lat: villageRes.data.latitude, lng: villageRes.data.longitude });
     }
   };
@@ -118,17 +114,23 @@ export const PresensiRegulerPage: React.FC = () => {
     );
   };
 
-  const geofenceValidation = attendanceService.validateGeofence({
-    latitude: currentCoords.lat,
-    longitude: currentCoords.lng,
-    accuracy: currentCoords.accuracy,
-    targetLatitude: officeCoords.lat,
-    targetLongitude: officeCoords.lng,
-    allowedRadiusMeters: allowedRadius,
-  });
+  const geofenceValidation = (currentCoords && officeCoords)
+    ? attendanceService.validateGeofence({
+        latitude: currentCoords.lat,
+        longitude: currentCoords.lng,
+        accuracy: currentCoords.accuracy,
+        targetLatitude: officeCoords.lat,
+        targetLongitude: officeCoords.lng,
+        allowedRadiusMeters: allowedRadius,
+      })
+    : { isValid: false, distanceMeters: undefined, message: 'Menunggu deteksi lokasi...' };
 
   const handleCheckIn = async () => {
     if (!currentUser) return;
+    if (!currentCoords) {
+      showToast('Lokasi GPS belum terdeteksi. Silakan aktifkan izin GPS pada perangkat Anda.', 'error');
+      return;
+    }
     setIsSubmitting(true);
     const res = await attendanceService.checkIn(
       currentUser.id,
@@ -154,6 +156,10 @@ export const PresensiRegulerPage: React.FC = () => {
 
   const handleCheckOut = async () => {
     if (!currentUser) return;
+    if (!currentCoords) {
+      showToast('Lokasi GPS belum terdeteksi. Silakan aktifkan izin GPS pada perangkat Anda.', 'error');
+      return;
+    }
     setIsSubmitting(true);
     const res = await attendanceService.checkOut(
       currentUser.id,
@@ -314,11 +320,11 @@ export const PresensiRegulerPage: React.FC = () => {
                 type="button"
                 className="btn btn-primary btn-lg"
                 onClick={handleCheckIn}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !currentCoords}
                 style={{ width: '100%' }}
               >
                 <CheckCircle2 size={20} />
-                {isSubmitting ? 'Mencatat Check-In...' : 'Lakukan Check-In Sekarang'}
+                {isSubmitting ? 'Mencatat Check-In...' : !currentCoords ? 'Menunggu GPS Terdeteksi...' : 'Lakukan Check-In Sekarang'}
               </button>
             ) : !todayRecord?.checkOutAt ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -340,11 +346,11 @@ export const PresensiRegulerPage: React.FC = () => {
                   type="button"
                   className="btn btn-secondary btn-lg"
                   onClick={handleCheckOut}
-                  disabled={isSubmitting || (!isAfterEndTime && !earlyLeaveReason.trim())}
+                  disabled={isSubmitting || !currentCoords || (!isAfterEndTime && !earlyLeaveReason.trim())}
                   style={{ width: '100%', borderColor: 'var(--color-primary-600)', color: 'var(--color-primary-700)' }}
                 >
                   <LogOut size={20} />
-                  {isSubmitting ? 'Mencatat Check-Out...' : 'Lakukan Check-Out (Presensi Pulang)'}
+                  {isSubmitting ? 'Mencatat Check-Out...' : !currentCoords ? 'Menunggu GPS Terdeteksi...' : 'Lakukan Check-Out (Presensi Pulang)'}
                 </button>
               </div>
             ) : (
@@ -406,16 +412,22 @@ export const PresensiRegulerPage: React.FC = () => {
           )}
 
 
-          <GeofencePreview
-            targetLat={officeCoords.lat}
-            targetLng={officeCoords.lng}
-            targetRadiusMeters={allowedRadius}
-            userLat={currentCoords.lat}
-            userLng={currentCoords.lng}
-            distanceMeters={geofenceValidation.distanceMeters}
-            isValid={geofenceValidation.isValid}
-            onSimulateCoords={handleSimulateCoords}
-          />
+          {officeCoords ? (
+            <GeofencePreview
+              targetLat={officeCoords.lat}
+              targetLng={officeCoords.lng}
+              targetRadiusMeters={allowedRadius}
+              userLat={currentCoords?.lat ?? null}
+              userLng={currentCoords?.lng ?? null}
+              distanceMeters={geofenceValidation.distanceMeters}
+              isValid={geofenceValidation.isValid}
+              onSimulateCoords={handleSimulateCoords}
+            />
+          ) : (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+              Memuat konfigurasi lokasi kantor desa...
+            </div>
+          )}
         </div>
       </div>
 

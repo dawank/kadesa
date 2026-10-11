@@ -17,10 +17,11 @@ import {
 
 export const ReportsPage: React.FC = () => {
   const { currentUser } = useAuth();
-  const { logo: villageLogo, villageName, letterheadConfig } = useBranding();
+  const { logo: villageLogo, villageName, letterheadConfig, locationSubtitle } = useBranding();
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'DAILY' | 'MONTHLY'>('DAILY');
   const [paperOrientation, setPaperOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const isPerangkat = currentUser?.role === 'PERANGKAT_DESA';
 
@@ -34,18 +35,28 @@ export const ReportsPage: React.FC = () => {
   const [monthlyData, setMonthlyData] = useState<MonthlyReportItem[]>([]);
 
   const loadDaily = async () => {
-    const res = await reportService.getDailyReport(dailyDate);
-    if (res.data) {
-      const items = isPerangkat ? res.data.filter((d) => d.userId === currentUser?.id) : res.data;
-      setDailyData(items);
+    setIsLoading(true);
+    try {
+      const res = await reportService.getDailyReport(dailyDate);
+      if (res.data) {
+        const items = isPerangkat ? res.data.filter((d) => d.userId === currentUser?.id) : res.data;
+        setDailyData(items);
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const loadMonthly = async () => {
-    const res = await reportService.getMonthlyReport(month, year);
-    if (res.data) {
-      const items = isPerangkat ? res.data.filter((m) => m.userId === currentUser?.id) : res.data;
-      setMonthlyData(items);
+    setIsLoading(true);
+    try {
+      const res = await reportService.getMonthlyReport(month, year);
+      if (res.data) {
+        const items = isPerangkat ? res.data.filter((m) => m.userId === currentUser?.id) : res.data;
+        setMonthlyData(items);
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -135,7 +146,8 @@ export const ReportsPage: React.FC = () => {
       villageLogo,
       villageName,
       letterheadConfig,
-      paperOrientation
+      paperOrientation,
+      locationSubtitle
     );
     showToast(
       `Dokumen PDF (${paperOrientation === 'landscape' ? 'Mendatar / Landscape' : 'Tegak / Portrait'}) berhasil dibuka.`,
@@ -310,33 +322,47 @@ export const ReportsPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {dailyData.map((d) => (
-                  <tr key={d.id}>
-                    <td><strong>{d.nama}</strong></td>
-                    <td>{d.jabatan}</td>
-                    <td>
-                      <span style={{ fontFamily: 'var(--font-mono)' }}>{d.checkIn || '—'}</span>
-                    </td>
-                    <td>
-                      <span style={{ fontFamily: 'var(--font-mono)' }}>{d.checkOut || '—'}</span>
-                    </td>
-                    <td>
-                      <StatusBadge status={d.status} size="sm" />
-                    </td>
-                    <td>
-                      {d.isLate ? (
-                        <span style={{ color: '#b45309', fontWeight: 700 }}>{d.lateMinutes} Menit</span>
-                      ) : (
-                        <span style={{ color: 'var(--text-muted)' }}>—</span>
-                      )}
-                    </td>
-                    <td>
-                      <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                        {d.note || 'Tepat Waktu'}
-                      </span>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                      Memuat laporan kehadiran...
                     </td>
                   </tr>
-                ))}
+                ) : dailyData.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                      Belum ada data kehadiran pada tanggal {dailyDate}.
+                    </td>
+                  </tr>
+                ) : (
+                  dailyData.map((d) => (
+                    <tr key={d.id}>
+                      <td><strong>{d.nama}</strong></td>
+                      <td>{d.jabatan}</td>
+                      <td>
+                        <span style={{ fontFamily: 'var(--font-mono)' }}>{d.checkIn || '—'}</span>
+                      </td>
+                      <td>
+                        <span style={{ fontFamily: 'var(--font-mono)' }}>{d.checkOut || '—'}</span>
+                      </td>
+                      <td>
+                        <StatusBadge status={d.status} size="sm" />
+                      </td>
+                      <td>
+                        {d.isLate ? (
+                          <span style={{ color: '#b45309', fontWeight: 700 }}>{d.lateMinutes} Menit</span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+                      <td>
+                        <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                          {d.note || 'Tepat Waktu'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -369,7 +395,19 @@ export const ReportsPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {monthlyData.map((m) => (
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={11} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                      Memuat rekapitulasi bulanan...
+                    </td>
+                  </tr>
+                ) : monthlyData.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                      Belum ada data rekapitulasi kehadiran untuk periode {month}/{year}.
+                    </td>
+                  </tr>
+                ) : monthlyData.map((m) => (
                   <tr key={m.userId}>
                     <td><strong>{m.nama}</strong></td>
                     <td>{m.jabatan}</td>

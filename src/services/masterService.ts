@@ -1,18 +1,23 @@
 import { Village, Position } from '../types/master';
 import { User, validatePasswordLength, formatAuthPasswordError } from '../types/auth';
-import { mockVillage, mockPositions, mockUsers } from '../mock/mockData';
 import { ApiResponse, simulateNetworkDelay, IS_DEMO_MODE } from './apiClient';
 import { authService } from './authService';
 import { auditService } from './auditService';
 import { supabase, isSupabaseConfigured, supabaseUrl, supabaseAnonKey } from './supabaseClient';
 
 class MasterService {
-  private village: Village = {
-    ...mockVillage,
-    logo: (typeof window !== 'undefined' && localStorage.getItem('kadesa_village_logo')) || mockVillage.logo || '/logo-kadesa.png',
-  };
-  private positions: Position[] = [...mockPositions];
-  private apparatusList: User[] = [...mockUsers];
+  private village: Village | null = null;
+  private positions: Position[] = [];
+  private apparatusList: User[] = [];
+
+  /**
+   * Khusus isolasi unit test offline - tidak digunakan dalam runtime produksi
+   */
+  seedTestFixtures(fixtures: { village?: Village; positions?: Position[]; apparatusList?: User[] }): void {
+    if (fixtures.village) this.village = { ...fixtures.village };
+    if (fixtures.positions) this.positions = [...fixtures.positions];
+    if (fixtures.apparatusList) this.apparatusList = [...fixtures.apparatusList];
+  }
 
   // Village
   async getVillage(): Promise<ApiResponse<Village>> {
@@ -57,11 +62,18 @@ class MasterService {
       }
     }
     await simulateNetworkDelay(200);
-    return { success: true, data: { ...this.village } };
+    return { success: true, data: this.village ? { ...this.village } : undefined };
   }
 
   async updateVillage(data: Partial<Village>): Promise<ApiResponse<Village>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Konfigurasi Supabase belum terpasang di environment.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const dbPayload: any = {};
         if (data.nama !== undefined) dbPayload.nama = data.nama;
@@ -77,10 +89,16 @@ class MasterService {
         }
         dbPayload.updated_at = new Date().toISOString();
 
+        let targetId = this.village?.id;
+        if (!targetId) {
+          const { data: firstVillage } = await supabase.from('villages').select('id').limit(1).maybeSingle();
+          targetId = firstVillage?.id || 'vil-001';
+        }
+
         const { data: updated, error } = await supabase
           .from('villages')
           .update(dbPayload)
-          .eq('id', this.village.id || 'vil-001')
+          .eq('id', targetId)
           .select()
           .single();
 
@@ -88,7 +106,7 @@ class MasterService {
           return { success: false, message: `Gagal memperbarui profil desa: ${error.message}` };
         }
         if (updated) {
-          const oldVillage = { ...this.village };
+          const oldVillage = this.village ? { ...this.village } : null;
           this.village = {
             id: updated.id,
             nama: updated.nama,
@@ -99,14 +117,28 @@ class MasterService {
             alamat: updated.alamat || '',
             latitude: Number(updated.latitude),
             longitude: Number(updated.longitude),
-            logo: updated.logo_desa || this.village.logo,
-            createdAt: updated.created_at || this.village.createdAt,
+            logo: updated.logo_desa || this.village?.logo || '/logo-kadesa.png',
+            createdAt: updated.created_at || this.village?.createdAt || new Date().toISOString(),
             updatedAt: updated.updated_at,
           };
 
-          if (typeof window !== 'undefined' && this.village.logo) {
-            localStorage.setItem('kadesa_village_logo', this.village.logo);
-            window.dispatchEvent(new CustomEvent('kadesa-branding-changed', { detail: { logo: this.village.logo } }));
+          if (typeof window !== 'undefined') {
+            if (this.village.logo) {
+              localStorage.setItem('kadesa_village_logo', this.village.logo);
+            }
+            if (this.village.nama) localStorage.setItem('kadesa_village_name', this.village.nama);
+            if (this.village.kecamatan) localStorage.setItem('kadesa_village_kecamatan', this.village.kecamatan);
+            if (this.village.kabupaten) localStorage.setItem('kadesa_village_kabupaten', this.village.kabupaten);
+            if (this.village.provinsi) localStorage.setItem('kadesa_village_provinsi', this.village.provinsi);
+
+            window.dispatchEvent(
+              new CustomEvent('kadesa-branding-changed', {
+                detail: {
+                  village: this.village,
+                  logo: this.village.logo,
+                },
+              })
+            );
           }
 
           try {
@@ -118,7 +150,7 @@ class MasterService {
               eventType: 'MASTER_UPDATED',
               entityType: 'villages',
               entityId: this.village.id,
-              beforeData: { latitude: oldVillage.latitude, longitude: oldVillage.longitude },
+              beforeData: oldVillage ? { latitude: oldVillage.latitude, longitude: oldVillage.longitude } : null,
               afterData: { latitude: this.village.latitude, longitude: this.village.longitude },
               reason: 'Pembaruan profil desa dan titik koordinat pusat geofence',
             });
@@ -133,15 +165,36 @@ class MasterService {
       }
     }
     await simulateNetworkDelay(400);
-    const oldVillage = { ...this.village };
+    const oldVillage = this.village ? { ...this.village } : null;
     this.village = {
-      ...this.village,
-      ...data,
+      id: this.village?.id || 'vil-001',
+      nama: data.nama ?? this.village?.nama ?? '',
+      kecamatan: data.kecamatan ?? this.village?.kecamatan ?? '',
+      kabupaten: data.kabupaten ?? this.village?.kabupaten ?? '',
+      provinsi: data.provinsi ?? this.village?.provinsi ?? '',
+      kodePos: data.kodePos ?? this.village?.kodePos ?? '',
+      alamat: data.alamat ?? this.village?.alamat ?? '',
+      latitude: data.latitude ?? this.village?.latitude ?? 0,
+      longitude: data.longitude ?? this.village?.longitude ?? 0,
+      logo: data.logo ?? this.village?.logo ?? '/logo-kadesa.png',
+      createdAt: this.village?.createdAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    if (typeof window !== 'undefined' && this.village.logo) {
-      localStorage.setItem('kadesa_village_logo', this.village.logo);
-      window.dispatchEvent(new CustomEvent('kadesa-branding-changed', { detail: { logo: this.village.logo } }));
+    if (typeof window !== 'undefined') {
+      if (this.village.logo) localStorage.setItem('kadesa_village_logo', this.village.logo);
+      if (this.village.nama) localStorage.setItem('kadesa_village_name', this.village.nama);
+      if (this.village.kecamatan) localStorage.setItem('kadesa_village_kecamatan', this.village.kecamatan);
+      if (this.village.kabupaten) localStorage.setItem('kadesa_village_kabupaten', this.village.kabupaten);
+      if (this.village.provinsi) localStorage.setItem('kadesa_village_provinsi', this.village.provinsi);
+
+      window.dispatchEvent(
+        new CustomEvent('kadesa-branding-changed', {
+          detail: {
+            village: this.village,
+            logo: this.village.logo,
+          },
+        })
+      );
     }
 
     const currentUser = await authService.getCurrentUser();
@@ -152,7 +205,7 @@ class MasterService {
       eventType: 'MASTER_UPDATED',
       entityType: 'villages',
       entityId: this.village.id,
-      beforeData: { latitude: oldVillage.latitude, longitude: oldVillage.longitude },
+      beforeData: oldVillage ? { latitude: oldVillage.latitude, longitude: oldVillage.longitude } : null,
       afterData: { latitude: this.village.latitude, longitude: this.village.longitude },
       reason: 'Pembaruan profil desa dan titik koordinat pusat geofence',
     });
@@ -163,13 +216,14 @@ class MasterService {
   async updateVillageLogo(logoDataUrl: string): Promise<ApiResponse<string>> {
     if (!IS_DEMO_MODE && isSupabaseConfigured()) {
       try {
+        const targetId = this.village?.id || 'vil-001';
         const { error } = await supabase
           .from('villages')
           .update({
             logo_desa: logoDataUrl,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', this.village.id || 'vil-001');
+          .eq('id', targetId);
 
         if (error) {
           console.warn('Supabase updateVillageLogo warning:', error.message);
@@ -180,8 +234,10 @@ class MasterService {
     }
 
     await simulateNetworkDelay(300);
-    this.village.logo = logoDataUrl;
-    this.village.updatedAt = new Date().toISOString();
+    if (this.village) {
+      this.village.logo = logoDataUrl;
+      this.village.updatedAt = new Date().toISOString();
+    }
     if (typeof window !== 'undefined') {
       localStorage.setItem('kadesa_village_logo', logoDataUrl);
       window.dispatchEvent(new CustomEvent('kadesa-branding-changed', { detail: { logo: logoDataUrl } }));
@@ -193,13 +249,14 @@ class MasterService {
     const defaultLogo = '/logo-kadesa.png';
     if (!IS_DEMO_MODE && isSupabaseConfigured()) {
       try {
+        const targetId = this.village?.id || 'vil-001';
         const { error } = await supabase
           .from('villages')
           .update({
             logo_desa: defaultLogo,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', this.village.id || 'vil-001');
+          .eq('id', targetId);
 
         if (error) {
           console.warn('Supabase removeVillageLogo warning:', error.message);
@@ -210,8 +267,10 @@ class MasterService {
     }
 
     await simulateNetworkDelay(300);
-    this.village.logo = defaultLogo;
-    this.village.updatedAt = new Date().toISOString();
+    if (this.village) {
+      this.village.logo = defaultLogo;
+      this.village.updatedAt = new Date().toISOString();
+    }
     if (typeof window !== 'undefined') {
       localStorage.setItem('kadesa_village_logo', defaultLogo);
       window.dispatchEvent(new CustomEvent('kadesa-branding-changed', { detail: { logo: defaultLogo } }));

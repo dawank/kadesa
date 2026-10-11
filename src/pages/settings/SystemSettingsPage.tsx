@@ -121,8 +121,8 @@ export const SystemSettingsPage: React.FC = () => {
   }
 
   const [geofenceForm, setGeofenceForm] = useState<GeofenceFormState>({
-    office_lat: -6.4828,
-    office_lng: 106.8436,
+    office_lat: 0,
+    office_lng: 0,
     regular_radius: 100,
     dl_min_radius: 25,
     dl_max_radius: 500,
@@ -280,8 +280,8 @@ export const SystemSettingsPage: React.FC = () => {
       const dlMax = Number(items.find((s) => s.key === 'DL_MAX_RADIUS_METERS')?.value) || 500;
       const confirmed = items.find((s) => s.key === 'OFFICE_COORDINATES_CONFIRMED')?.value !== 'false';
 
-      let lat = vRes.data?.latitude ?? -6.4828;
-      let lng = vRes.data?.longitude ?? 106.8436;
+      let lat = vRes.data?.latitude ?? 0;
+      let lng = vRes.data?.longitude ?? 0;
       const officeCoordsSetting = items.find((s) => s.key === 'OFFICE_COORDINATES')?.value;
       if (officeCoordsSetting && officeCoordsSetting.includes(',')) {
         const parts = officeCoordsSetting.split(',').map((p) => Number(p.trim()));

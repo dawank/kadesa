@@ -35,9 +35,9 @@ export const MasterAparaturPage: React.FC = () => {
   const { currentUser, hasPermission } = useAuth();
   const { showToast } = useToast();
 
-  const [apparatusList, setApparatusList] = useState<User[]>(() => masterService.getCachedApparatusList());
-  const [positions, setPositions] = useState<Position[]>(() => masterService.getCachedPositions());
-  const [isLoading, setIsLoading] = useState(apparatusList.length === 0);
+  const [apparatusList, setApparatusList] = useState<User[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterJabatan, setFilterJabatan] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');

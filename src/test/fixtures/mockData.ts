@@ -1,12 +1,12 @@
-import { User } from '../types/auth';
-import { Village, Position } from '../types/master';
-import { AttendanceRecord } from '../types/attendance';
-import { DLAssignment } from '../types/dl';
-import { AbsenceRequest, LeaveRequest } from '../types/absence';
-import { CorrectionRequest } from '../types/correction';
-import { NotificationItem } from '../types/notification';
-import { AuditLogItem, SecurityEventItem } from '../types/audit';
-import { SystemSettingItem, WorkSchedule, Holiday, LetterheadConfig } from '../types/settings';
+import { User } from '../../types/auth';
+import { Village, Position } from '../../types/master';
+import { AttendanceRecord } from '../../types/attendance';
+import { DLAssignment } from '../../types/dl';
+import { AbsenceRequest, LeaveRequest } from '../../types/absence';
+import { CorrectionRequest } from '../../types/correction';
+import { NotificationItem } from '../../types/notification';
+import { AuditLogItem, SecurityEventItem } from '../../types/audit';
+import { SystemSettingItem, WorkSchedule, Holiday, LetterheadConfig } from '../../types/settings';
 
 export const mockVillage: Village = {
   id: 'vil-001',

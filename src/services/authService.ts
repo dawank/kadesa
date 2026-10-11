@@ -1,15 +1,22 @@
 import { User, UserRole, PermissionAction, AuthSession, validatePasswordLength, formatAuthPasswordError } from '../types/auth';
-import { mockUsers } from '../mock/mockData';
 import { ApiResponse, simulateNetworkDelay, IS_DEMO_MODE } from './apiClient';
 import { supabase, isSupabaseConfigured, supabaseUrl, supabaseAnonKey } from './supabaseClient';
 
 const AUTH_STORAGE_KEY = 'kadesa_current_user_id';
 
 class AuthService {
-  private users: User[] = [...mockUsers];
+  private users: User[] = [];
   private currentUserId: string | null = null;
   private currentAccessToken: string | null = null;
   private userPasswords: Record<string, string> = {};
+
+  /**
+   * Khusus isolasi unit test offline
+   */
+  seedTestFixtures(fixtures: { users?: User[]; userPasswords?: Record<string, string> }): void {
+    if (fixtures.users) this.users = [...fixtures.users];
+    if (fixtures.userPasswords) this.userPasswords = { ...fixtures.userPasswords };
+  }
 
   getAccessToken(): string | null {
     return null;

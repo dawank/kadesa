@@ -1,11 +1,18 @@
 import { AuditLogItem, SecurityEventItem, AuditEventType } from '../types/audit';
-import { mockAuditLogs, mockSecurityEvents } from '../mock/mockData';
 import { ApiResponse, simulateNetworkDelay, IS_DEMO_MODE } from './apiClient';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 
 class AuditService {
-  private auditLogs: AuditLogItem[] = [...mockAuditLogs];
-  private securityEvents: SecurityEventItem[] = [...mockSecurityEvents];
+  private auditLogs: AuditLogItem[] = [];
+  private securityEvents: SecurityEventItem[] = [];
+
+  /**
+   * Khusus isolasi unit test offline
+   */
+  seedTestFixtures(fixtures: { auditLogs?: AuditLogItem[]; securityEvents?: SecurityEventItem[] }): void {
+    if (fixtures.auditLogs) this.auditLogs = [...fixtures.auditLogs];
+    if (fixtures.securityEvents) this.securityEvents = [...fixtures.securityEvents];
+  }
 
   getCachedAuditLogs(): AuditLogItem[] {
     return this.auditLogs;

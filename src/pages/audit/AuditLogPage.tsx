@@ -14,11 +14,11 @@ import {
 
 export const AuditLogPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'AUDIT' | 'SECURITY'>('AUDIT');
-  const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(() => auditService.getCachedAuditLogs());
-  const [securityEvents, setSecurityEvents] = useState<SecurityEventItem[]>(() => auditService.getCachedSecurityEvents());
+  const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
+  const [securityEvents, setSecurityEvents] = useState<SecurityEventItem[]>([]);
   const [eventTypeFilter, setEventTypeFilter] = useState<AuditEventType | 'ALL'>('ALL');
   const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
-  const [isLoading, setIsLoading] = useState(auditLogs.length === 0);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;

@@ -13,15 +13,19 @@ function formatLineStyle(line: LetterheadLineConfig): string {
 function buildLetterheadMarkup(
   config: LetterheadConfig | undefined,
   villageLogo?: string,
-  villageName = 'Desa Sukamaju'
+  villageName?: string,
+  locationSubtitle?: string
 ): string {
   if (!config) {
+    const vTitle = villageName
+      ? (villageName.toUpperCase().startsWith('DESA') ? `PEMERINTAH ${villageName.toUpperCase()}` : `PEMERINTAH DESA ${villageName.toUpperCase()}`)
+      : 'PEMERINTAH DESA';
     return `
       <div class="header" style="display: flex; align-items: center; justify-content: center; gap: 1.5rem; border-bottom: 3px double #0f172a; padding-bottom: 1rem; margin-bottom: 1.5rem;">
         ${villageLogo ? `<img src="${villageLogo}" alt="Logo Desa" style="width: 72px; height: 72px; object-fit: contain;" />` : ''}
         <div class="header-text" style="text-align: center;">
-          <h2 style="margin: 0; font-size: 1.35rem; text-transform: uppercase; letter-spacing: 0.5px;">PEMERINTAH ${villageName.toUpperCase()}</h2>
-          <p style="margin: 0.25rem 0 0; font-size: 0.875rem; color: #475569;">Kecamatan Cibinong, Kabupaten Bogor, Jawa Barat</p>
+          <h2 style="margin: 0; font-size: 1.35rem; text-transform: uppercase; letter-spacing: 0.5px;">${vTitle}</h2>
+          ${locationSubtitle ? `<p style="margin: 0.25rem 0 0; font-size: 0.875rem; color: #475569;">${locationSubtitle}</p>` : ''}
           <p class="app-sub" style="margin: 0.25rem 0 0; font-size: 0.8125rem; font-weight: 600; color: #047857;">Sistem Informasi Kehadiran Aparatur Desa (KADESA)</p>
         </div>
       </div>
@@ -401,9 +405,10 @@ class ReportService {
     rows: (string | number)[][],
     subtitle?: string,
     villageLogo?: string,
-    villageName = 'Desa Sukamaju',
+    villageName?: string,
     letterheadConfig?: LetterheadConfig,
-    orientation?: 'portrait' | 'landscape'
+    orientation?: 'portrait' | 'landscape',
+    locationSubtitle?: string
   ): void {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -414,7 +419,7 @@ class ReportService {
     const effectiveOrientation: 'portrait' | 'landscape' =
       orientation || letterheadConfig?.defaultOrientation || 'portrait';
 
-    const headerMarkup = buildLetterheadMarkup(letterheadConfig, villageLogo, villageName);
+    const headerMarkup = buildLetterheadMarkup(letterheadConfig, villageLogo, villageName, locationSubtitle);
 
     const now = new Date();
     const dateFormatted = now.toLocaleDateString('id-ID', {

@@ -4,18 +4,27 @@ import {
   Holiday,
   SettingCategory,
   LetterheadConfig,
+  DEFAULT_LETTERHEAD_CONFIG,
   TimezoneOption,
   INDONESIA_TIMEZONES,
 } from '../types/settings';
-import { mockSystemSettings, mockWorkSchedules, mockHolidays, defaultMockLetterheadConfig } from '../mock/mockData';
 import { ApiResponse, simulateNetworkDelay, IS_DEMO_MODE } from './apiClient';
 import { auditService } from './auditService';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 
 class SettingsService {
-  private settings: SystemSettingItem[] = [...mockSystemSettings];
-  private schedules: WorkSchedule[] = [...mockWorkSchedules];
-  private holidays: Holiday[] = [...mockHolidays];
+  private settings: SystemSettingItem[] = [];
+  private schedules: WorkSchedule[] = [];
+  private holidays: Holiday[] = [];
+
+  /**
+   * Khusus isolasi unit test offline
+   */
+  seedTestFixtures(fixtures: { settings?: SystemSettingItem[]; schedules?: WorkSchedule[]; holidays?: Holiday[] }): void {
+    if (fixtures.settings) this.settings = [...fixtures.settings];
+    if (fixtures.schedules) this.schedules = [...fixtures.schedules];
+    if (fixtures.holidays) this.holidays = [...fixtures.holidays];
+  }
 
   /**
    * Centralized Configuration Resolver (as specified in PRD Section 108 & 36.7)
@@ -581,7 +590,7 @@ class SettingsService {
         return JSON.parse(val);
       } catch {}
     }
-    return defaultMockLetterheadConfig;
+    return DEFAULT_LETTERHEAD_CONFIG;
   }
 
   async updateLetterheadConfig(
@@ -604,19 +613,19 @@ class SettingsService {
   async resetLetterheadConfig(updatedBy = 'Operator'): Promise<ApiResponse<LetterheadConfig>> {
     await simulateNetworkDelay(300);
     const today = new Date().toISOString().split('T')[0];
-    const jsonStr = JSON.stringify(defaultMockLetterheadConfig);
+    const jsonStr = JSON.stringify(DEFAULT_LETTERHEAD_CONFIG);
     await this.updateSetting('LETTERHEAD_CONFIG', jsonStr, today, updatedBy);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('kadesa_letterhead_config');
       window.dispatchEvent(
         new CustomEvent('kadesa-branding-changed', {
-          detail: { letterheadConfig: defaultMockLetterheadConfig },
+          detail: { letterheadConfig: DEFAULT_LETTERHEAD_CONFIG },
         })
       );
     }
     return {
       success: true,
-      data: defaultMockLetterheadConfig,
+      data: DEFAULT_LETTERHEAD_CONFIG,
       message: 'Desain kop surat berhasil direset ke standar',
     };
   }
