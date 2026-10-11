@@ -78,14 +78,14 @@ cp .env.example .env.local
 
 Buka `.env.local` dan sesuaikan nilainya:
 ```env
-# URL Project Supabase
-VITE_SUPABASE_URL=https://qjiwxtvhzeitjtznhkdc.supabase.co
+# Supabase Project URL (Ditemukan di Supabase Dashboard -> Project Settings -> API -> Project URL)
+VITE_SUPABASE_URL=https://your-project-ref.supabase.co
 
-# Supabase Anon / Publishable Key
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+# Supabase Publishable / Anon Key (Ditemukan di Supabase Dashboard -> Project Settings -> API -> Project API keys -> anon/public)
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key-here
 
-# Set false untuk terhubung langsung ke database Supabase Cloud
-VITE_ENABLE_DEMO_MODE=false
+# Mode Demo Frontend (Set false untuk menghubungkan langsung ke database Supabase)
+VITE_ENABLE_DEMO_MODE=true
 ```
 
 > **Catatan Keamanan**: Jangan pernah menempelkan `service_role` key atau password administratif ke dalam berkas `.env.local` maupun source code.
