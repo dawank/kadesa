@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { masterService } from '../services/masterService';
 import { settingsService } from '../services/settingsService';
-import { LetterheadConfig } from '../types/settings';
-import { defaultMockLetterheadConfig } from '../mock/mockData';
+import { LetterheadConfig, DEFAULT_LETTERHEAD_CONFIG } from '../types/settings';
 
 export const DEFAULT_VILLAGE_LOGO = '/logo-kadesa.png';
 export const DEFAULT_LOGIN_BACKGROUND = 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=1920&q=80';
@@ -49,7 +48,7 @@ export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         } catch {}
       }
     }
-    return defaultMockLetterheadConfig;
+    return DEFAULT_LETTERHEAD_CONFIG;
   });
 
   const refreshBranding = async () => {
@@ -194,7 +193,7 @@ export const useBranding = (): BrandingContextType => {
       logo: (typeof window !== 'undefined' && localStorage.getItem('kadesa_village_logo')) || DEFAULT_VILLAGE_LOGO,
       villageName: 'Desa Sukamaju',
       loginBackground: (typeof window !== 'undefined' && localStorage.getItem('kadesa_login_bg')) || DEFAULT_LOGIN_BACKGROUND,
-      letterheadConfig: defaultMockLetterheadConfig,
+      letterheadConfig: DEFAULT_LETTERHEAD_CONFIG,
       updateVillageLogo: async () => false,
       removeVillageLogo: async () => false,
       updateLoginBackground: async () => false,

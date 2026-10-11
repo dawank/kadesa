@@ -16,7 +16,15 @@ class AbsenceService {
 
   // --- IZIN & SAKIT ---
   async getAbsences(userId?: string, state?: AbsenceState | 'ALL'): Promise<ApiResponse<AbsenceRequest[]>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+          data: [],
+        };
+      }
       try {
         let query = supabase
           .from('absence_requests')
@@ -34,26 +42,24 @@ class AbsenceService {
         if (error) {
           return { success: false, message: `Gagal memuat data izin/sakit: ${error.message}`, data: [] };
         }
-        if (data) {
-          const list: AbsenceRequest[] = data.map((r: any) => ({
-            id: r.id,
-            userId: r.user_id,
-            userNama: r.user?.nama || 'Aparatur',
-            userJabatan: r.user?.positions?.nama || r.user?.jabatan_id || 'Aparatur',
-            type: r.type as AbsenceType,
-            startDate: r.start_date,
-            endDate: r.end_date,
-            reason: r.reason,
-            attachmentUrl: r.attachment_url,
-            state: r.state === 'SUBMITTED' ? 'PENDING' : r.state,
-            processedByUserId: r.approved_by || r.verified_by,
-            processedAt: r.approved_at || r.verified_at,
-            rejectionReason: r.rejection_reason,
-            createdAt: r.created_at,
-            updatedAt: r.updated_at,
-          }));
-          return { success: true, data: list };
-        }
+        const list: AbsenceRequest[] = (data || []).map((r: any) => ({
+          id: r.id,
+          userId: r.user_id,
+          userNama: r.user?.nama || 'Aparatur',
+          userJabatan: r.user?.positions?.nama || r.user?.jabatan_id || 'Aparatur',
+          type: r.type as AbsenceType,
+          startDate: r.start_date,
+          endDate: r.end_date,
+          reason: r.reason,
+          attachmentUrl: r.attachment_url,
+          state: r.state === 'SUBMITTED' ? 'PENDING' : r.state,
+          processedByUserId: r.approved_by || r.verified_by,
+          processedAt: r.approved_at || r.verified_at,
+          rejectionReason: r.rejection_reason,
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
+        }));
+        return { success: true, data: list };
       } catch (err: any) {
         return { success: false, message: `Gagal memuat data izin/sakit: ${err.message || err}`, data: [] };
       }
@@ -84,7 +90,14 @@ class AbsenceService {
       return { success: false, message: 'Tanggal dan alasan permohonan wajib diisi' };
     }
 
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const id = `abs-${Date.now().toString().slice(-4)}`;
         const { data, error } = await supabase
@@ -120,11 +133,11 @@ class AbsenceService {
             createdAt: data.created_at,
             updatedAt: data.updated_at,
           };
-          this.absences.unshift(newReq);
           return { success: true, data: newReq, message: `Pengajuan ${type} berhasil dikirim (Menunggu Persetujuan)` };
         }
+        return { success: false, message: 'Gagal mengirim permohonan' };
       } catch (err: any) {
-        return { success: false, message: `Gagal mengirim permohonan: ${err.message}` };
+        return { success: false, message: `Gagal mengirim permohonan: ${err.message || err}` };
       }
     }
 
@@ -159,7 +172,14 @@ class AbsenceService {
       return { success: false, message: 'Alasan penolakan wajib diisi' };
     }
 
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const { data, error } = await supabase
           .from('absence_requests')
@@ -174,7 +194,10 @@ class AbsenceService {
           .select('*, user:users!absence_requests_user_id_fkey(nama, jabatan_id, positions(nama))')
           .single();
 
-        if (!error && data) {
+        if (error) {
+          return { success: false, message: `Gagal memproses permohonan: ${error.message}` };
+        }
+        if (data) {
           const userObj = (data as any).user || (data as any).users;
           const item: AbsenceRequest = {
             id: data.id,
@@ -194,16 +217,15 @@ class AbsenceService {
             createdAt: data.created_at,
             updatedAt: data.updated_at,
           };
-          const idx = this.absences.findIndex((a) => a.id === id);
-          if (idx !== -1) this.absences[idx] = item;
           return {
             success: true,
             data: item,
             message: `Permohonan ${item.type} berhasil di-${decision === 'APPROVED' ? 'setujui' : 'tolak'}`,
           };
         }
-      } catch (err) {
-        console.warn('Supabase processAbsence error:', err);
+        return { success: false, message: 'Permohonan tidak ditemukan di database' };
+      } catch (err: any) {
+        return { success: false, message: `Gagal memproses permohonan: ${err.message || err}` };
       }
     }
 
@@ -226,7 +248,14 @@ class AbsenceService {
   }
 
   async cancelAbsence(id: string, userId: string): Promise<ApiResponse<AbsenceRequest>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const { data, error } = await supabase
           .from('absence_requests')
@@ -236,7 +265,10 @@ class AbsenceService {
           .select('*, user:users!absence_requests_user_id_fkey(nama, jabatan_id, positions(nama))')
           .single();
 
-        if (!error && data) {
+        if (error) {
+          return { success: false, message: `Gagal membatalkan permohonan: ${error.message}` };
+        }
+        if (data) {
           const userObj = (data as any).user || (data as any).users;
           const item: AbsenceRequest = {
             id: data.id,
@@ -252,11 +284,11 @@ class AbsenceService {
             createdAt: data.created_at,
             updatedAt: data.updated_at,
           };
-          this.absences = this.absences.filter((a) => a.id !== id);
           return { success: true, data: item, message: 'Pengajuan berhasil dibatalkan' };
         }
-      } catch (err) {
-        console.warn('Supabase cancelAbsence error:', err);
+        return { success: false, message: 'Permohonan tidak ditemukan di database' };
+      } catch (err: any) {
+        return { success: false, message: `Gagal membatalkan permohonan: ${err.message || err}` };
       }
     }
 
@@ -277,7 +309,15 @@ class AbsenceService {
 
   // --- CUTI ---
   async getLeaves(userId?: string, state?: LeaveState | 'ALL'): Promise<ApiResponse<LeaveRequest[]>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+          data: [],
+        };
+      }
       try {
         let query = supabase
           .from('absence_requests')
@@ -292,33 +332,31 @@ class AbsenceService {
         if (error) {
           return { success: false, message: `Gagal memuat data cuti: ${error.message}`, data: [] };
         }
-        if (data) {
-          const list: LeaveRequest[] = data.map((r: any) => ({
-            id: r.id,
-            userId: r.user_id,
-            userNama: r.user?.nama || 'Aparatur',
-            userJabatan: r.user?.positions?.nama || r.user?.jabatan_id || 'Aparatur',
-            leaveType: (r.type.replace('CUTI_', '') as LeaveType),
-            startDate: r.start_date,
-            endDate: r.end_date,
-            reason: r.reason,
-            attachmentUrl: r.attachment_url,
-            state: r.state as LeaveState,
-            verifiedByUserId: r.verified_by,
-            verifiedAt: r.verified_at,
-            approvedByUserId: r.approved_by,
-            approvedAt: r.approved_at,
-            rejectionReason: r.rejection_reason,
-            timeline: [
-              { status: 'SUBMITTED', actor: r.users?.nama || 'Pemohon', timestamp: r.created_at },
-              ...(r.verified_at ? [{ status: 'VERIFIED' as LeaveState, actor: 'Verifikator', timestamp: r.verified_at }] : []),
-              ...(r.approved_at ? [{ status: r.state as LeaveState, actor: 'Kepala Desa', timestamp: r.approved_at, note: r.rejection_reason }] : []),
-            ],
-            createdAt: r.created_at,
-            updatedAt: r.updated_at,
-          }));
-          return { success: true, data: list };
-        }
+        const list: LeaveRequest[] = (data || []).map((r: any) => ({
+          id: r.id,
+          userId: r.user_id,
+          userNama: r.user?.nama || 'Aparatur',
+          userJabatan: r.user?.positions?.nama || r.user?.jabatan_id || 'Aparatur',
+          leaveType: (r.type.replace('CUTI_', '') as LeaveType),
+          startDate: r.start_date,
+          endDate: r.end_date,
+          reason: r.reason,
+          attachmentUrl: r.attachment_url,
+          state: r.state as LeaveState,
+          verifiedByUserId: r.verified_by,
+          verifiedAt: r.verified_at,
+          approvedByUserId: r.approved_by,
+          approvedAt: r.approved_at,
+          rejectionReason: r.rejection_reason,
+          timeline: [
+            { status: 'SUBMITTED', actor: r.users?.nama || 'Pemohon', timestamp: r.created_at },
+            ...(r.verified_at ? [{ status: 'VERIFIED' as LeaveState, actor: 'Verifikator', timestamp: r.verified_at }] : []),
+            ...(r.approved_at ? [{ status: r.state as LeaveState, actor: 'Kepala Desa', timestamp: r.approved_at, note: r.rejection_reason }] : []),
+          ],
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
+        }));
+        return { success: true, data: list };
       } catch (err: any) {
         return { success: false, message: `Gagal memuat data cuti: ${err.message || err}`, data: [] };
       }
@@ -349,7 +387,14 @@ class AbsenceService {
       return { success: false, message: 'Tanggal dan alasan cuti wajib diisi' };
     }
 
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const id = `lve-${Date.now().toString().slice(-4)}`;
         const dbType = `CUTI_${leaveType}`;
@@ -387,11 +432,11 @@ class AbsenceService {
             createdAt: data.created_at,
             updatedAt: data.updated_at,
           };
-          this.leaves.unshift(newLeave);
           return { success: true, data: newLeave, message: 'Permohonan cuti berhasil diajukan (Menunggu Verifikasi)' };
         }
+        return { success: false, message: 'Gagal mengajukan cuti' };
       } catch (err: any) {
-        return { success: false, message: `Gagal mengajukan cuti: ${err.message}` };
+        return { success: false, message: `Gagal mengajukan cuti: ${err.message || err}` };
       }
     }
 
@@ -430,7 +475,14 @@ class AbsenceService {
     verifierNama: string,
     notes?: string
   ): Promise<ApiResponse<LeaveRequest>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const now = new Date().toISOString();
         const { data, error } = await supabase
@@ -445,7 +497,10 @@ class AbsenceService {
           .select('*, user:users!absence_requests_user_id_fkey(nama, jabatan_id, positions(nama))')
           .single();
 
-        if (!error && data) {
+        if (error) {
+          return { success: false, message: `Gagal memverifikasi cuti: ${error.message}` };
+        }
+        if (data) {
           const userObj = (data as any).user || (data as any).users;
           const item: LeaveRequest = {
             id: data.id,
@@ -467,16 +522,15 @@ class AbsenceService {
             createdAt: data.created_at,
             updatedAt: now,
           };
-          const idx = this.leaves.findIndex((l) => l.id === id);
-          if (idx !== -1) this.leaves[idx] = item;
           return {
             success: true,
             data: item,
             message: 'Cuti berhasil diverifikasi. Diteruskan ke Kepala Desa untuk persetujuan akhir.',
           };
         }
-      } catch (err) {
-        console.warn('Supabase verifyLeave error:', err);
+        return { success: false, message: 'Permohonan cuti tidak ditemukan di database' };
+      } catch (err: any) {
+        return { success: false, message: `Gagal memverifikasi cuti: ${err.message || err}` };
       }
     }
 
@@ -524,7 +578,14 @@ class AbsenceService {
       return { success: false, message: 'Alasan penolakan cuti wajib diisi' };
     }
 
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const now = new Date().toISOString();
         const updatePayload: any = {
@@ -545,7 +606,10 @@ class AbsenceService {
           .select('*, user:users!absence_requests_user_id_fkey(nama, jabatan_id, positions(nama))')
           .single();
 
-        if (!error && data) {
+        if (error) {
+          return { success: false, message: `Gagal memproses persetujuan cuti: ${error.message}` };
+        }
+        if (data) {
           const userObj = (data as any).user || (data as any).users;
           const item: LeaveRequest = {
             id: data.id,
@@ -568,16 +632,15 @@ class AbsenceService {
             createdAt: data.created_at,
             updatedAt: now,
           };
-          const idx = this.leaves.findIndex((l) => l.id === id);
-          if (idx !== -1) this.leaves[idx] = item;
           return {
             success: true,
             data: item,
             message: `Permohonan cuti telah ${decision === 'APPROVED' ? 'disetujui' : 'ditolak'} oleh Kepala Desa`,
           };
         }
-      } catch (err) {
-        console.warn('Supabase approveLeave error:', err);
+        return { success: false, message: 'Permohonan cuti tidak ditemukan di database' };
+      } catch (err: any) {
+        return { success: false, message: `Gagal memproses persetujuan cuti: ${err.message || err}` };
       }
     }
 
@@ -611,7 +674,14 @@ class AbsenceService {
   }
 
   async cancelLeave(id: string, userId: string): Promise<ApiResponse<LeaveRequest>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const { data, error } = await supabase
           .from('absence_requests')
@@ -621,7 +691,10 @@ class AbsenceService {
           .select('*, user:users!absence_requests_user_id_fkey(nama, jabatan_id, positions(nama))')
           .single();
 
-        if (!error && data) {
+        if (error) {
+          return { success: false, message: `Gagal membatalkan cuti: ${error.message}` };
+        }
+        if (data) {
           const userObj = (data as any).user || (data as any).users;
           const item: LeaveRequest = {
             id: data.id,
@@ -637,11 +710,11 @@ class AbsenceService {
             createdAt: data.created_at,
             updatedAt: new Date().toISOString(),
           };
-          this.leaves = this.leaves.filter((l) => l.id !== id);
           return { success: true, data: item, message: 'Pengajuan cuti berhasil dibatalkan' };
         }
-      } catch (err) {
-        console.warn('Supabase cancelLeave error:', err);
+        return { success: false, message: 'Permohonan cuti tidak ditemukan di database' };
+      } catch (err: any) {
+        return { success: false, message: `Gagal membatalkan cuti: ${err.message || err}` };
       }
     }
 

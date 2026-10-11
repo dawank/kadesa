@@ -16,7 +16,14 @@ class MasterService {
 
   // Village
   async getVillage(): Promise<ApiResponse<Village>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Konfigurasi Supabase belum terpasang di environment.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const { data, error } = await supabase.from('villages').select('*').limit(1).maybeSingle();
         if (error) {
@@ -33,13 +40,18 @@ class MasterService {
             alamat: data.alamat || '',
             latitude: Number(data.latitude),
             longitude: Number(data.longitude),
-            logo: data.logo_desa || data.logo || this.village.logo,
-            createdAt: data.created_at || this.village.createdAt,
+            logo: data.logo_desa || data.logo || '/logo-kadesa.png',
+            createdAt: data.created_at || new Date().toISOString(),
             updatedAt: data.updated_at,
           };
           this.village = v;
           return { success: true, data: v };
         }
+        return {
+          success: true,
+          data: undefined,
+          message: 'Profil desa belum dikonfigurasi di database.',
+        };
       } catch (err: any) {
         return { success: false, message: `Gagal memuat profil desa: ${err.message || err}` };
       }
@@ -217,31 +229,37 @@ class MasterService {
   }
 
   async getPositions(): Promise<ApiResponse<Position[]>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Konfigurasi Supabase belum terpasang di environment.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+          data: [],
+        };
+      }
       try {
         const [{ data: posData, error: posError }, { data: usersData, error: uError }] = await Promise.all([
           supabase.from('positions').select('*').order('id'),
           supabase.from('users').select('jabatan_id, active'),
         ]);
         if (posError) {
-          return { success: false, message: `Gagal memuat data jabatan: ${posError.message}` };
+          return { success: false, message: `Gagal memuat data jabatan: ${posError.message}`, data: [] };
         }
         if (uError) {
-          return { success: false, message: `Gagal memuat data pengguna: ${uError.message}` };
+          return { success: false, message: `Gagal memuat data pengguna: ${uError.message}`, data: [] };
         }
-        if (posData) {
-          const list: Position[] = posData.map((p) => ({
-            id: p.id,
-            nama: p.nama,
-            active: p.active,
-            effectiveFrom: p.effective_from,
-            aparaturCount: (usersData || []).filter((u) => u.jabatan_id === p.id && u.active).length,
-          }));
-          this.positions = list;
-          return { success: true, data: list };
-        }
+        const list: Position[] = (posData || []).map((p) => ({
+          id: p.id,
+          nama: p.nama,
+          active: p.active,
+          effectiveFrom: p.effective_from,
+          aparaturCount: (usersData || []).filter((u) => u.jabatan_id === p.id && u.active).length,
+        }));
+        this.positions = list;
+        return { success: true, data: list };
       } catch (err: any) {
-        return { success: false, message: `Gagal memuat data jabatan: ${err.message || err}` };
+        return { success: false, message: `Gagal memuat data jabatan: ${err.message || err}`, data: [] };
       }
     }
     await simulateNetworkDelay(200);
@@ -353,7 +371,15 @@ class MasterService {
 
   // Apparatus (Perangkat Desa)
   async getApparatusList(search?: string, jabatanId?: string, activeOnly?: boolean): Promise<ApiResponse<User[]>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Konfigurasi Supabase belum terpasang di environment.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+          data: [],
+        };
+      }
       try {
         let query = supabase.from('users').select('*, positions(nama)').order('created_at', { ascending: true });
         if (jabatanId) {
@@ -364,34 +390,32 @@ class MasterService {
         }
         const { data: uData, error: uError } = await query;
         if (uError) {
-          return { success: false, message: `Gagal memuat data aparatur: ${uError.message}` };
+          return { success: false, message: `Gagal memuat data aparatur: ${uError.message}`, data: [] };
         }
-        if (uData) {
-          let list: User[] = uData.map((u) => ({
-            id: u.id,
-            authUserId: u.auth_user_id,
-            username: u.username,
-            nama: u.nama,
-            nik: u.nik,
-            nipd: u.nipd,
-            nomorWhatsapp: u.nomor_whatsapp,
-            fotoReference: u.foto_reference,
-            role: u.role,
-            jabatanId: u.jabatan_id,
-            jabatanNama: (u as any).positions?.nama || u.jabatan_id || 'Aparatur Desa',
-            attendanceRequired: u.attendance_required,
-            active: u.active,
-            effectiveFrom: u.effective_from,
-          }));
-          if (search) {
-            const q = search.toLowerCase();
-            list = list.filter(a => a.nama.toLowerCase().includes(q) || a.nik.includes(q) || (a.nipd && a.nipd.includes(q)));
-          }
-          this.apparatusList = list;
-          return { success: true, data: list };
+        let list: User[] = (uData || []).map((u) => ({
+          id: u.id,
+          authUserId: u.auth_user_id,
+          username: u.username,
+          nama: u.nama,
+          nik: u.nik,
+          nipd: u.nipd,
+          nomorWhatsapp: u.nomor_whatsapp,
+          fotoReference: u.foto_reference,
+          role: u.role,
+          jabatanId: u.jabatan_id,
+          jabatanNama: (u as any).positions?.nama || u.jabatan_id || 'Aparatur Desa',
+          attendanceRequired: u.attendance_required,
+          active: u.active,
+          effectiveFrom: u.effective_from,
+        }));
+        if (search) {
+          const q = search.toLowerCase();
+          list = list.filter(a => a.nama.toLowerCase().includes(q) || a.nik.includes(q) || (a.nipd && a.nipd.includes(q)));
         }
+        this.apparatusList = list;
+        return { success: true, data: list };
       } catch (err: any) {
-        return { success: false, message: `Gagal memuat data aparatur: ${err.message || err}` };
+        return { success: false, message: `Gagal memuat data aparatur: ${err.message || err}`, data: [] };
       }
     }
     await simulateNetworkDelay(300);

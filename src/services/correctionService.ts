@@ -9,7 +9,15 @@ class CorrectionService {
   private requests: CorrectionRequest[] = [...mockCorrectionRequests];
 
   async getCorrections(): Promise<ApiResponse<CorrectionRequest[]>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+          data: [],
+        };
+      }
       try {
         const { data, error } = await supabase
           .from('attendance_corrections')
@@ -19,33 +27,31 @@ class CorrectionService {
         if (error) {
           return { success: false, message: `Gagal memuat permohonan koreksi: ${error.message}`, data: [] };
         }
-        if (data) {
-          const list: CorrectionRequest[] = data.map((c: any) => ({
-            id: c.id,
-            attendanceRecordId: c.attendance_record_id,
-            userId: c.user_id,
-            userNama: c.users?.nama || 'Aparatur',
-            userJabatan: c.users?.positions?.nama || c.users?.jabatan_id || 'Aparatur',
-            attendanceDate: c.original_check_in ? c.original_check_in.split('T')[0] : new Date().toISOString().split('T')[0],
-            originalCheckIn: c.original_check_in,
-            originalCheckOut: c.original_check_out,
-            originalStatus: c.original_status,
-            correctedCheckIn: c.corrected_check_in,
-            correctedCheckOut: c.corrected_check_out,
-            correctedStatus: c.corrected_status,
-            reason: c.reason,
-            requestedByUserId: c.requested_by,
-            requestedByNama: 'Operator',
-            processedByUserId: c.approved_by || '',
-            processedByNama: c.approved_by ? 'Pejabat Pengesah' : '',
-            processedAt: c.approved_at || '',
-            appliedAt: c.applied_at,
-            appliedByUserId: c.applied_by,
-            state: c.state === 'APPROVED' ? 'APPROVED' : c.state === 'REJECTED' ? 'REJECTED' : 'PENDING',
-            createdAt: c.created_at,
-          }));
-          return { success: true, data: list };
-        }
+        const list: CorrectionRequest[] = (data || []).map((c: any) => ({
+          id: c.id,
+          attendanceRecordId: c.attendance_record_id,
+          userId: c.user_id,
+          userNama: c.users?.nama || 'Aparatur',
+          userJabatan: c.users?.positions?.nama || c.users?.jabatan_id || 'Aparatur',
+          attendanceDate: c.original_check_in ? c.original_check_in.split('T')[0] : new Date().toISOString().split('T')[0],
+          originalCheckIn: c.original_check_in,
+          originalCheckOut: c.original_check_out,
+          originalStatus: c.original_status,
+          correctedCheckIn: c.corrected_check_in,
+          correctedCheckOut: c.corrected_check_out,
+          correctedStatus: c.corrected_status,
+          reason: c.reason,
+          requestedByUserId: c.requested_by,
+          requestedByNama: 'Operator',
+          processedByUserId: c.approved_by || '',
+          processedByNama: c.approved_by ? 'Pejabat Pengesah' : '',
+          processedAt: c.approved_at || '',
+          appliedAt: c.applied_at,
+          appliedByUserId: c.applied_by,
+          state: c.state === 'APPROVED' ? 'APPROVED' : c.state === 'REJECTED' ? 'REJECTED' : 'PENDING',
+          createdAt: c.created_at,
+        }));
+        return { success: true, data: list };
       } catch (err: any) {
         return { success: false, message: `Gagal memuat permohonan koreksi: ${err.message || err}`, data: [] };
       }
@@ -80,7 +86,14 @@ class CorrectionService {
     const now = new Date().toISOString();
     const id = `cor-${Date.now().toString().slice(-4)}`;
 
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const { data: inserted, error: insErr } = await supabase
           .from('attendance_corrections')
@@ -134,13 +147,13 @@ class CorrectionService {
             state: 'PENDING',
             createdAt: inserted.created_at,
           };
-          this.requests.unshift(req);
           return {
             success: true,
             data: req,
             message: 'Pengajuan koreksi presensi berhasil dibuat (Status: PENDING) dan menunggu persetujuan pejabat berwenang.',
           };
         }
+        return { success: false, message: 'Gagal mengajukan koreksi presensi' };
       } catch (err: any) {
         return {
           success: false,
@@ -192,7 +205,14 @@ class CorrectionService {
   ): Promise<ApiResponse<CorrectionRequest>> {
     const now = new Date().toISOString();
 
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const { data: currCorr, error: fetchErr } = await supabase
           .from('attendance_corrections')
@@ -276,9 +296,6 @@ class CorrectionService {
           createdAt: approvedCorr.created_at,
         };
 
-        const idx = this.requests.findIndex((r) => r.id === correctionId);
-        if (idx >= 0) this.requests[idx] = mapped;
-
         return { success: true, data: mapped, message: 'Koreksi presensi berhasil disetujui dan diterapkan.' };
       } catch (err: any) {
         return { success: false, message: `Gagal menyetujui koreksi: ${err.message || err}` };
@@ -313,7 +330,14 @@ class CorrectionService {
   ): Promise<ApiResponse<CorrectionRequest>> {
     const now = new Date().toISOString();
 
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const { data: rejectedCorr, error: rejErr } = await supabase
           .from('attendance_corrections')
@@ -354,9 +378,6 @@ class CorrectionService {
           state: 'REJECTED',
           createdAt: rejectedCorr.created_at,
         };
-
-        const idx = this.requests.findIndex((r) => r.id === correctionId);
-        if (idx >= 0) this.requests[idx] = mapped;
 
         return { success: true, data: mapped, message: 'Permohonan koreksi presensi telah ditolak.' };
       } catch (err: any) {

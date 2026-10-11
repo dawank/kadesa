@@ -87,33 +87,42 @@ class SettingsService {
   }
 
   async getAllSettings(category?: SettingCategory): Promise<ApiResponse<SystemSettingItem[]>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Konfigurasi Supabase belum terpasang di environment.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+          data: [],
+        };
+      }
       try {
         let query = supabase.from('system_settings').select('*').order('category').order('key');
         if (category) {
           query = query.eq('category', category);
         }
         const { data, error } = await query;
-        if (!error && data && data.length > 0) {
-          const list: SystemSettingItem[] = data.map((d) => ({
-            id: d.id,
-            key: d.key,
-            label: d.description || d.key,
-            value: d.value,
-            valueType: d.value_type || 'string',
-            description: d.description || '',
-            category: d.category as any,
-            effectiveFrom: d.effective_from,
-            effectiveTo: d.effective_to,
-            status: d.status,
-            updatedBy: d.updated_by || 'system',
-            updatedAt: d.updated_at,
-          }));
-          this.settings = list;
-          return { success: true, data: list };
+        if (error) {
+          return { success: false, message: `Gagal memuat pengaturan dari database: ${error.message}`, data: [] };
         }
-      } catch (err) {
-        console.warn('Supabase getAllSettings error:', err);
+        const list: SystemSettingItem[] = (data || []).map((d) => ({
+          id: d.id,
+          key: d.key,
+          label: d.description || d.key,
+          value: d.value,
+          valueType: d.value_type || 'string',
+          description: d.description || '',
+          category: d.category as any,
+          effectiveFrom: d.effective_from,
+          effectiveTo: d.effective_to,
+          status: d.status,
+          updatedBy: d.updated_by || 'system',
+          updatedAt: d.updated_at,
+        }));
+        this.settings = list;
+        return { success: true, data: list };
+      } catch (err: any) {
+        return { success: false, message: `Gagal memuat pengaturan: ${err.message || err}`, data: [] };
       }
     }
     await simulateNetworkDelay(200);
@@ -219,28 +228,37 @@ class SettingsService {
 
   // Work Schedules (Integrated with Supabase Cloud work_schedules)
   async getWorkSchedules(): Promise<ApiResponse<WorkSchedule[]>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Konfigurasi Supabase belum terpasang di environment.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+          data: [],
+        };
+      }
       try {
         const { data, error } = await supabase
           .from('work_schedules')
           .select('*')
           .order('day_of_week', { ascending: true });
 
-        if (!error && data && data.length > 0) {
-          const list: WorkSchedule[] = data.map((d: any) => ({
-            id: d.id,
-            dayOfWeek: d.day_of_week,
-            dayName: d.day_name,
-            startTime: d.start_time ? d.start_time.slice(0, 5) : '07:30',
-            endTime: d.end_time ? d.end_time.slice(0, 5) : '15:30',
-            toleranceMinutes: d.tolerance_minutes != null ? Number(d.tolerance_minutes) : 15,
-            active: Boolean(d.active),
-          }));
-          this.schedules = list;
-          return { success: true, data: list };
+        if (error) {
+          return { success: false, message: `Gagal memuat jadwal kerja dari database: ${error.message}`, data: [] };
         }
+        const list: WorkSchedule[] = (data || []).map((d: any) => ({
+          id: d.id,
+          dayOfWeek: d.day_of_week,
+          dayName: d.day_name,
+          startTime: d.start_time ? d.start_time.slice(0, 5) : '07:30',
+          endTime: d.end_time ? d.end_time.slice(0, 5) : '15:30',
+          toleranceMinutes: d.tolerance_minutes != null ? Number(d.tolerance_minutes) : 15,
+          active: Boolean(d.active),
+        }));
+        this.schedules = list;
+        return { success: true, data: list };
       } catch (err: any) {
-        console.warn('Supabase getWorkSchedules error:', err);
+        return { success: false, message: `Gagal memuat jadwal kerja: ${err.message || err}`, data: [] };
       }
     }
     await simulateNetworkDelay(200);
@@ -411,25 +429,34 @@ class SettingsService {
 
   // Holidays (Integrated with Supabase Cloud)
   async getHolidays(): Promise<ApiResponse<Holiday[]>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Konfigurasi Supabase belum terpasang di environment.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+          data: [],
+        };
+      }
       try {
         const { data, error } = await supabase
           .from('holidays')
           .select('*')
           .order('date', { ascending: true });
 
-        if (!error && data && data.length > 0) {
-          const list: Holiday[] = data.map((d: any) => ({
-            id: d.id,
-            date: d.date,
-            name: d.name,
-            active: Boolean(d.active),
-          }));
-          this.holidays = list;
-          return { success: true, data: list };
+        if (error) {
+          return { success: false, message: `Gagal memuat hari libur dari database: ${error.message}`, data: [] };
         }
-      } catch (err) {
-        console.warn('Supabase getHolidays error:', err);
+        const list: Holiday[] = (data || []).map((d: any) => ({
+          id: d.id,
+          date: d.date,
+          name: d.name,
+          active: Boolean(d.active),
+        }));
+        this.holidays = list;
+        return { success: true, data: list };
+      } catch (err: any) {
+        return { success: false, message: `Gagal memuat hari libur: ${err.message || err}`, data: [] };
       }
     }
     await simulateNetworkDelay(200);

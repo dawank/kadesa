@@ -100,10 +100,26 @@ function buildLetterheadMarkup(
 
 class ReportService {
   async getDailyReport(date?: string): Promise<ApiResponse<DailyReportItem[]>> {
-    await simulateNetworkDelay(250);
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+          data: [],
+        };
+      }
+    } else {
+      await simulateNetworkDelay(250);
+    }
+
     const targetDate = date || new Date().toISOString().split('T')[0];
 
     const users = await authService.getAllUsers();
+    if (users.length === 0 && !IS_DEMO_MODE) {
+      return { success: true, data: [] };
+    }
+
     const attRes = await attendanceService.getAllAttendance(targetDate);
     if (!attRes.success && !IS_DEMO_MODE) {
       return {
@@ -145,6 +161,14 @@ class ReportService {
           note = note ? `${note} | ${earlyText}` : earlyText;
         }
 
+        let lateMinutes = 0;
+        if (status === 'TERLAMBAT' && checkIn && dayScheduleInfo.schedule?.startTime) {
+          const [cinH, cinM] = checkIn.split(':').map(Number);
+          const [schedH, schedM] = dayScheduleInfo.schedule.startTime.split(':').map(Number);
+          const diff = cinH * 60 + cinM - (schedH * 60 + schedM);
+          lateMinutes = Math.max(0, diff);
+        }
+
         return {
           id: `rep-${user.id}`,
           userId: user.id,
@@ -155,7 +179,7 @@ class ReportService {
           checkOut,
           status,
           isLate: status === 'TERLAMBAT',
-          lateMinutes: status === 'TERLAMBAT' ? 12 : 0,
+          lateMinutes,
           isEarlyLeave,
           earlyLeaveMinutes,
           earlyLeaveReason,
@@ -167,8 +191,6 @@ class ReportService {
   }
 
   async getMonthlyReport(month: number, year: number): Promise<ApiResponse<MonthlyReportItem[]>> {
-    await simulateNetworkDelay(300);
-
     const timezone = await settingsService.getStringSetting('TIMEZONE', 'Asia/Jakarta');
     const lastDay = new Date(year, month, 0).getDate();
 
@@ -187,7 +209,15 @@ class ReportService {
 
     const users = await authService.getAllUsers();
 
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+          data: [],
+        };
+      }
       try {
         const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
         const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
@@ -245,17 +275,26 @@ class ReportService {
       }
     }
 
+    await simulateNetworkDelay(300);
+    const attRes = await attendanceService.getAllAttendance();
+    const allRecords = attRes.data || [];
+    const prefix = `${year}-${String(month).padStart(2, '0')}`;
+
     const monthlyData: MonthlyReportItem[] = users
       .filter((u) => u.attendanceRequired && u.active)
       .map((user) => {
-        const hadir = 18;
-        const terlambat = 2;
-        const izin = 1;
-        const sakit = 0;
-        const cuti = 0;
-        const dinasLuar = 1;
-        const alpha = totalWorkdays - (hadir + terlambat + izin + sakit + cuti + dinasLuar);
-        const persentase = Math.round(((hadir + terlambat + dinasLuar) / totalWorkdays) * 100);
+        const userRecords = allRecords.filter(
+          (r) => r.userId === user.id && r.attendanceDate.startsWith(prefix)
+        );
+        const hadir = userRecords.filter((r) => r.status === 'HADIR').length;
+        const terlambat = userRecords.filter((r) => r.status === 'TERLAMBAT').length;
+        const izin = userRecords.filter((r) => r.status === 'IZIN').length;
+        const sakit = userRecords.filter((r) => r.status === 'SAKIT').length;
+        const cuti = userRecords.filter((r) => r.status === 'CUTI').length;
+        const dinasLuar = userRecords.filter((r) => r.status === 'DINAS_LUAR').length;
+        const alpha = Math.max(0, totalWorkdays - (hadir + terlambat + izin + sakit + cuti + dinasLuar));
+        const persentase =
+          totalWorkdays > 0 ? Math.round(((hadir + terlambat + dinasLuar) / totalWorkdays) * 100) : 0;
 
         return {
           userId: user.id,
@@ -268,7 +307,7 @@ class ReportService {
           sakit,
           cuti,
           dinasLuar,
-          alpha: Math.max(0, alpha),
+          alpha,
           attendancePercentage: persentase,
         };
       });

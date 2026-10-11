@@ -4,7 +4,7 @@ import {
   DLLocation,
   DLEvidence,
 } from '../types/dl';
-import { mockDLAssignments, mockVillage } from '../mock/mockData';
+import { mockDLAssignments } from '../mock/mockData';
 import { ApiResponse, simulateNetworkDelay, IS_DEMO_MODE } from './apiClient';
 import { calculateHaversineDistanceMeters } from './attendanceService';
 import { settingsService } from './settingsService';
@@ -67,7 +67,15 @@ class DLService {
   private assignments: DLAssignment[] = [...mockDLAssignments];
 
   async getAssignments(status?: DLState | 'ALL', userId?: string): Promise<ApiResponse<DLAssignment[]>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+          data: [],
+        };
+      }
       try {
         let query = supabase
           .from('dl_assignments')
@@ -91,10 +99,7 @@ class DLService {
         if (error) {
           return { success: false, message: `Gagal memuat tugas Dinas Luar: ${error.message}`, data: [] };
         }
-        if (data) {
-          const list = data.map(mapDbRowToDLAssignment);
-          return { success: true, data: list };
-        }
+        return { success: true, data: (data || []).map(mapDbRowToDLAssignment) };
       } catch (err: any) {
         return { success: false, message: `Gagal memuat tugas Dinas Luar: ${err.message || err}`, data: [] };
       }
@@ -114,7 +119,14 @@ class DLService {
   }
 
   async getAssignmentById(id: string): Promise<ApiResponse<DLAssignment>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const { data, error } = await supabase
           .from('dl_assignments')
@@ -134,6 +146,7 @@ class DLService {
         if (data) {
           return { success: true, data: mapDbRowToDLAssignment(data) };
         }
+        return { success: false, message: 'Surat tugas Dinas Luar tidak ditemukan' };
       } catch (err: any) {
         return { success: false, message: `Gagal memuat detail Dinas Luar: ${err.message || err}` };
       }
@@ -175,7 +188,14 @@ class DLService {
       active: true,
     }));
 
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const id = `dla-${Date.now().toString().slice(-6)}`;
         const nomorSurat = `${Math.floor(100 + Math.random() * 900)}/ST-DL/SKM/${new Date().getMonth() + 1}/${new Date().getFullYear()}`;
@@ -215,11 +235,11 @@ class DLService {
           await supabase.from('dl_locations').insert(locsToInsert);
           newDlRow.dl_locations = locsToInsert;
           const mapped = mapDbRowToDLAssignment(newDlRow);
-          this.assignments.unshift(mapped);
           return { success: true, data: mapped, message: 'Pengajuan Dinas Luar berhasil dibuat (Menunggu Verifikasi)' };
         }
+        return { success: false, message: 'Gagal membuat penugasan DL' };
       } catch (err: any) {
-        return { success: false, message: `Gagal membuat penugasan DL: ${err.message}` };
+        return { success: false, message: `Gagal membuat penugasan DL: ${err.message || err}` };
       }
     }
 
@@ -269,7 +289,14 @@ class DLService {
     actorRole: string,
     notes?: string
   ): Promise<ApiResponse<DLAssignment>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const { data: updated, error } = await supabase
           .from('dl_assignments')
@@ -289,14 +316,16 @@ class DLService {
           `)
           .single();
 
-        if (!error && updated) {
+        if (error) {
+          return { success: false, message: `Gagal memverifikasi Dinas Luar: ${error.message}` };
+        }
+        if (updated) {
           const mapped = mapDbRowToDLAssignment(updated);
-          const idx = this.assignments.findIndex((a) => a.id === id);
-          if (idx !== -1) this.assignments[idx] = mapped;
           return { success: true, data: mapped, message: 'Dinas Luar berhasil diverifikasi' };
         }
-      } catch (err) {
-        console.warn('Supabase verifyAssignment error:', err);
+        return { success: false, message: 'Dinas Luar tidak ditemukan di database' };
+      } catch (err: any) {
+        return { success: false, message: `Gagal memverifikasi Dinas Luar: ${err.message || err}` };
       }
     }
 
@@ -333,7 +362,14 @@ class DLService {
     const deadlineHours = await settingsService.getNumberSetting('DL_RATIFICATION_DEADLINE_HOURS', 72);
     const deadline = new Date(Date.now() + deadlineHours * 3600 * 1000).toISOString();
 
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const { data: updated, error } = await supabase
           .from('dl_assignments')
@@ -354,14 +390,16 @@ class DLService {
           `)
           .single();
 
-        if (!error && updated) {
+        if (error) {
+          return { success: false, message: `Gagal menyetujui Dinas Luar: ${error.message}` };
+        }
+        if (updated) {
           const mapped = mapDbRowToDLAssignment(updated);
-          const idx = this.assignments.findIndex((a) => a.id === id);
-          if (idx !== -1) this.assignments[idx] = mapped;
           return { success: true, data: mapped, message: `Dinas Luar disetujui (Batas ratifikasi ${deadlineHours} jam)` };
         }
-      } catch (err) {
-        console.warn('Supabase approveAssignment error:', err);
+        return { success: false, message: 'Dinas Luar tidak ditemukan di database' };
+      } catch (err: any) {
+        return { success: false, message: `Gagal menyetujui Dinas Luar: ${err.message || err}` };
       }
     }
 
@@ -415,7 +453,14 @@ class DLService {
       return { success: false, message: 'Hanya Kepala Desa yang berwenang meratifikasi Dinas Luar.' };
     }
 
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const { data: updated, error } = await supabase
           .from('dl_assignments')
@@ -436,14 +481,16 @@ class DLService {
           `)
           .single();
 
-        if (!error && updated) {
+        if (error) {
+          return { success: false, message: `Gagal meratifikasi Dinas Luar: ${error.message}` };
+        }
+        if (updated) {
           const mapped = mapDbRowToDLAssignment(updated);
-          const idx = this.assignments.findIndex((a) => a.id === id);
-          if (idx !== -1) this.assignments[idx] = mapped;
           return { success: true, data: mapped, message: 'Dinas Luar berhasil diratifikasi oleh Kepala Desa' };
         }
-      } catch (err) {
-        console.warn('Supabase ratifyAssignment error:', err);
+        return { success: false, message: 'Dinas Luar tidak ditemukan di database' };
+      } catch (err: any) {
+        return { success: false, message: `Gagal meratifikasi Dinas Luar: ${err.message || err}` };
       }
     }
 
@@ -488,7 +535,14 @@ class DLService {
       return { success: false, message: 'Alasan penolakan wajib diisi' };
     }
 
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const { data: updated, error } = await supabase
           .from('dl_assignments')
@@ -507,14 +561,16 @@ class DLService {
           `)
           .single();
 
-        if (!error && updated) {
+        if (error) {
+          return { success: false, message: `Gagal menolak Dinas Luar: ${error.message}` };
+        }
+        if (updated) {
           const mapped = mapDbRowToDLAssignment(updated);
-          const idx = this.assignments.findIndex((a) => a.id === id);
-          if (idx !== -1) this.assignments[idx] = mapped;
           return { success: true, data: mapped, message: 'Pengajuan Dinas Luar telah ditolak' };
         }
-      } catch (err) {
-        console.warn('Supabase rejectAssignment error:', err);
+        return { success: false, message: 'Dinas Luar tidak ditemukan di database' };
+      } catch (err: any) {
+        return { success: false, message: `Gagal menolak Dinas Luar: ${err.message || err}` };
       }
     }
 
@@ -566,7 +622,14 @@ class DLService {
       return { success: false, message: 'Alasan pembatalan wajib diisi' };
     }
 
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const { data: updated, error } = await supabase
           .from('dl_assignments')
@@ -585,14 +648,16 @@ class DLService {
           `)
           .single();
 
-        if (!error && updated) {
+        if (error) {
+          return { success: false, message: `Gagal membatalkan Dinas Luar: ${error.message}` };
+        }
+        if (updated) {
           const mapped = mapDbRowToDLAssignment(updated);
-          const idx = this.assignments.findIndex((a) => a.id === id);
-          if (idx !== -1) this.assignments[idx] = mapped;
           return { success: true, data: mapped, message: 'Dinas Luar berhasil dibatalkan' };
         }
-      } catch (err) {
-        console.warn('Supabase cancelAssignment error:', err);
+        return { success: false, message: 'Dinas Luar tidak ditemukan di database' };
+      } catch (err: any) {
+        return { success: false, message: `Gagal membatalkan Dinas Luar: ${err.message || err}` };
       }
     }
 
@@ -717,14 +782,20 @@ class DLService {
 
     // Check-out may also be done at the village office (PRD Section 14.2)
     if (type === 'CHECK_OUT' && !isInsideAnyLocation) {
-      const officeDist = calculateHaversineDistanceMeters(
-        coords.latitude,
-        coords.longitude,
-        mockVillage.latitude,
-        mockVillage.longitude
-      );
-      if (officeDist <= 100) {
-        isInsideAnyLocation = true;
+      const vRes = await masterService.getVillage();
+      const vLat = vRes.data?.latitude ?? (IS_DEMO_MODE ? -6.4828 : null);
+      const vLng = vRes.data?.longitude ?? (IS_DEMO_MODE ? 106.8572 : null);
+      const vRad = await settingsService.getNumberSetting('GEOFENCE_RADIUS_METERS', 100);
+      if (vLat != null && vLng != null) {
+        const officeDist = calculateHaversineDistanceMeters(
+          coords.latitude,
+          coords.longitude,
+          vLat,
+          vLng
+        );
+        if (officeDist <= vRad) {
+          isInsideAnyLocation = true;
+        }
       }
     }
 
@@ -738,7 +809,14 @@ class DLService {
     let serverTimestamp = new Date().toISOString();
     let today = serverTimestamp.split('T')[0];
 
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const { data: stData } = await supabase.rpc('get_server_time');
         if (stData) {
@@ -860,14 +938,13 @@ class DLService {
       // Re-fetch updated assignment from Supabase
       const freshRes = await this.getAssignmentById(dlId);
       if (freshRes.success && freshRes.data) {
-        const idx = this.assignments.findIndex((a) => a.id === dlId);
-        if (idx !== -1) this.assignments[idx] = freshRes.data;
         return {
           success: true,
           data: freshRes.data,
           message: `Presensi ${type === 'CHECK_IN' ? 'Masuk' : 'Pulang'} Dinas Luar berhasil dicatat beserta bukti foto selfie ke Storage.`,
         };
       }
+      return { success: false, message: 'Gagal memuat ulang data Dinas Luar setelah transaksi presensi' };
     }
 
     const now = new Date().toISOString();

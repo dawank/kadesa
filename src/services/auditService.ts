@@ -21,7 +21,15 @@ class AuditService {
     startDate?: string;
     endDate?: string;
   }): Promise<ApiResponse<AuditLogItem[]>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+          data: [],
+        };
+      }
       try {
         let query = supabase.from('audit_logs').select('*').order('created_at', { ascending: false });
         if (filters?.eventType && filters.eventType !== 'ALL') {
@@ -45,27 +53,25 @@ class AuditService {
             data: [],
           };
         }
-        if (data) {
-          const list: AuditLogItem[] = data.map((d: any) => ({
-            id: d.id,
-            actorUserId: d.actor_user_id || 'system',
-            actorNama: d.actor_name || 'Sistem',
-            actorRole: d.actor_role || 'SISTEM',
-            eventType: d.action as AuditEventType,
-            entityType: d.entity_type,
-            entityId: d.entity_id,
-            beforeData: d.details?.beforeData,
-            afterData: d.details?.afterData,
-            reason: d.details?.reason,
-            ipAddress: d.ip_address,
-            userAgent: d.user_agent,
-            createdAt: d.created_at,
-          }));
-          if (!filters || ((!filters.eventType || filters.eventType === 'ALL') && !filters.actorId && !filters.startDate && !filters.endDate)) {
-            this.auditLogs = list;
-          }
-          return { success: true, data: list };
+        const list: AuditLogItem[] = (data || []).map((d: any) => ({
+          id: d.id,
+          actorUserId: d.actor_user_id || 'system',
+          actorNama: d.actor_name || 'Sistem',
+          actorRole: d.actor_role || 'SISTEM',
+          eventType: d.action as AuditEventType,
+          entityType: d.entity_type,
+          entityId: d.entity_id,
+          beforeData: d.details?.beforeData,
+          afterData: d.details?.afterData,
+          reason: d.details?.reason,
+          ipAddress: d.ip_address,
+          userAgent: d.user_agent,
+          createdAt: d.created_at,
+        }));
+        if (!filters || ((!filters.eventType || filters.eventType === 'ALL') && !filters.actorId && !filters.startDate && !filters.endDate)) {
+          this.auditLogs = list;
         }
+        return { success: true, data: list };
       } catch (err: any) {
         return {
           success: false,
@@ -95,6 +101,48 @@ class AuditService {
   }
 
   async getSecurityEvents(): Promise<ApiResponse<SecurityEventItem[]>> {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+          data: [],
+        };
+      }
+      try {
+        const { data, error } = await supabase
+          .from('audit_logs')
+          .select('*')
+          .in('action', ['LOGIN_FAILED', 'GEOFENCE_VIOLATION', 'TIME_ANOMALY', 'BRUTE_FORCE_ATTEMPT', 'UNAUTHORIZED_ACCESS'])
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          return {
+            success: false,
+            message: `Gagal memuat peringatan keamanan: ${error.message}`,
+            data: [],
+          };
+        }
+        const list: SecurityEventItem[] = (data || []).map((d: any) => ({
+          id: d.id,
+          severity: d.action === 'BRUTE_FORCE_ATTEMPT' || d.action === 'UNAUTHORIZED_ACCESS' ? 'CRITICAL' : d.action === 'GEOFENCE_VIOLATION' ? 'HIGH' : 'MEDIUM',
+          eventType: d.action,
+          actorNama: d.actor_name || 'Sistem Keamanan',
+          metadata: d.details || {},
+          state: 'NEW',
+          createdAt: d.created_at,
+        }));
+        return { success: true, data: list };
+      } catch (err: any) {
+        return {
+          success: false,
+          message: `Gagal memuat peringatan keamanan: ${err.message || 'Kesalahan database'}`,
+          data: [],
+        };
+      }
+    }
+
     await simulateNetworkDelay(200);
     return { success: true, data: [...this.securityEvents] };
   }

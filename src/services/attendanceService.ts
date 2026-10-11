@@ -166,7 +166,15 @@ class AttendanceService {
 
   async getTodayAttendanceForUser(userId: string): Promise<ApiResponse<AttendanceRecord | null>> {
     let today = new Date().toISOString().split('T')[0];
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Konfigurasi Supabase belum terpasang di environment.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+          data: null,
+        };
+      }
       try {
         const serverTime = await this.fetchServerTime();
         const timezone = await settingsService.getStringSetting('TIMEZONE', 'Asia/Jakarta');
@@ -179,13 +187,22 @@ class AttendanceService {
           .eq('attendance_date', today)
           .maybeSingle();
 
-        if (!error) {
-          if (!data) return { success: true, data: null };
-          const mapped = mapDbRecordToAttendanceRecord(data);
-          return { success: true, data: mapped };
+        if (error) {
+          return {
+            success: false,
+            message: `Gagal memuat status presensi hari ini: ${error.message}`,
+            data: null,
+          };
         }
-      } catch (err) {
-        console.warn('Supabase getTodayAttendanceForUser error:', err);
+        if (!data) return { success: true, data: null };
+        const mapped = mapDbRecordToAttendanceRecord(data);
+        return { success: true, data: mapped };
+      } catch (err: any) {
+        return {
+          success: false,
+          message: `Gagal memuat status presensi: ${err.message || err}`,
+          data: null,
+        };
       }
     }
 
@@ -197,7 +214,15 @@ class AttendanceService {
   }
 
   async getAllAttendance(date?: string, status?: string): Promise<ApiResponse<AttendanceRecord[]>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Konfigurasi Supabase belum terpasang di environment.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+          data: [],
+        };
+      }
       try {
         let query = supabase
           .from('attendance_records')
@@ -215,10 +240,8 @@ class AttendanceService {
         if (error) {
           return { success: false, message: `Gagal memuat data presensi dari database: ${error.message}`, data: [] };
         }
-        if (data) {
-          const list = data.map(mapDbRecordToAttendanceRecord);
-          return { success: true, data: list };
-        }
+        const list = (data || []).map(mapDbRecordToAttendanceRecord);
+        return { success: true, data: list };
       } catch (err: any) {
         return { success: false, message: `Gagal memuat data presensi: ${err.message || 'Kesalahan koneksi database'}`, data: [] };
       }
@@ -369,8 +392,16 @@ class AttendanceService {
 
     // Geofence check against village office
     const vRes = await masterService.getVillage();
-    const villageLat = vRes.data?.latitude ?? mockVillage.latitude;
-    const villageLng = vRes.data?.longitude ?? mockVillage.longitude;
+    const villageLat = vRes.data?.latitude ?? (IS_DEMO_MODE ? mockVillage.latitude : undefined);
+    const villageLng = vRes.data?.longitude ?? (IS_DEMO_MODE ? mockVillage.longitude : undefined);
+
+    if (villageLat == null || villageLng == null) {
+      return {
+        success: false,
+        message: 'Titik koordinat kantor desa belum dikonfigurasi di database. Hubungi administrator.',
+        errorCode: 'VILLAGE_COORDS_UNCONFIGURED',
+      };
+    }
 
     const allowedRadius = await settingsService.getNumberSetting('REGULAR_ATTENDANCE_RADIUS_METERS', 100);
     const geofenceResult = this.validateGeofence({
@@ -609,8 +640,16 @@ class AttendanceService {
     // Geofence check (hanya untuk REGULAR, DINAS_LUAR dikecualikan dari geofence kantor desa)
     if (!isDinasLuar) {
       const vRes = await masterService.getVillage();
-      const villageLat = vRes.data?.latitude ?? mockVillage.latitude;
-      const villageLng = vRes.data?.longitude ?? mockVillage.longitude;
+      const villageLat = vRes.data?.latitude ?? (IS_DEMO_MODE ? mockVillage.latitude : undefined);
+      const villageLng = vRes.data?.longitude ?? (IS_DEMO_MODE ? mockVillage.longitude : undefined);
+
+      if (villageLat == null || villageLng == null) {
+        return {
+          success: false,
+          message: 'Titik koordinat kantor desa belum dikonfigurasi di database. Hubungi administrator.',
+          errorCode: 'VILLAGE_COORDS_UNCONFIGURED',
+        };
+      }
 
       const allowedRadius = await settingsService.getNumberSetting('REGULAR_ATTENDANCE_RADIUS_METERS', 100);
       const geofenceResult = this.validateGeofence({

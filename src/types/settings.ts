@@ -118,3 +118,47 @@ export interface LetterheadConfig {
   defaultOrientation?: 'portrait' | 'landscape'; // Orientasi kertas cetak resmi
 }
 
+export const DEFAULT_LETTERHEAD_CONFIG: LetterheadConfig = {
+  templateId: 'standard_pemda',
+  fontFamily: 'Times New Roman, serif',
+  layout: 'left_logo_center_text',
+  logoSize: 76,
+  showLogo: true,
+  borderStyle: 'double',
+  borderColor: '#000000',
+  borderThickness: 3,
+  paddingBottom: 10,
+  defaultOrientation: 'portrait',
+  line1: {
+    text: 'PEMERINTAH DAERAH KABUPATEN TASIKMALAYA',
+    fontSize: 14,
+    fontWeight: '700',
+    fontStyle: 'normal',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  line2: {
+    text: 'KECAMATAN CISAYONG',
+    fontSize: 13,
+    fontWeight: '700',
+    fontStyle: 'normal',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  line3: {
+    text: 'DESA NUSAWANGI',
+    fontSize: 16,
+    fontWeight: '800',
+    fontStyle: 'normal',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  line4: {
+    text: 'Jl. Nusawangi no. 40 Cisayong 46153 Tasikmalaya | e-mail : nusawangi.ds@gmail.com',
+    fontSize: 10,
+    fontWeight: 'normal',
+    fontStyle: 'italic',
+    textTransform: 'none',
+    letterSpacing: 0,
+  },
+};

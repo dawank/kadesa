@@ -7,29 +7,38 @@ class NotificationService {
   private notifications: NotificationItem[] = [...mockNotifications];
 
   async getNotifications(userId?: string): Promise<ApiResponse<NotificationItem[]>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+          data: [],
+        };
+      }
       try {
         let query = supabase.from('notifications').select('*').order('created_at', { ascending: false });
         if (userId) {
           query = query.eq('recipient_user_id', userId);
         }
         const { data, error } = await query;
-        if (!error && data) {
-          const list: NotificationItem[] = data.map((n: any) => ({
-            id: n.id,
-            recipientUserId: n.recipient_user_id,
-            type: n.type,
-            title: n.title,
-            body: n.body,
-            referenceType: n.reference_type,
-            referenceId: n.reference_id,
-            readAt: n.read ? n.created_at : null,
-            createdAt: n.created_at,
-          }));
-          return { success: true, data: list };
+        if (error) {
+          return { success: false, message: `Gagal memuat notifikasi: ${error.message}`, data: [] };
         }
-      } catch (err) {
-        console.warn('Supabase getNotifications error:', err);
+        const list: NotificationItem[] = (data || []).map((n: any) => ({
+          id: n.id,
+          recipientUserId: n.recipient_user_id,
+          type: n.type,
+          title: n.title,
+          body: n.body,
+          referenceType: n.reference_type,
+          referenceId: n.reference_id,
+          readAt: n.read ? n.created_at : null,
+          createdAt: n.created_at,
+        }));
+        return { success: true, data: list };
+      } catch (err: any) {
+        return { success: false, message: `Gagal memuat notifikasi: ${err.message || err}`, data: [] };
       }
     }
 
@@ -42,11 +51,22 @@ class NotificationService {
   }
 
   async markAsRead(id: string): Promise<ApiResponse<boolean>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
-        await supabase.from('notifications').update({ read: true }).eq('id', id);
-      } catch (err) {
-        console.warn('Supabase markAsRead error:', err);
+        const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id);
+        if (error) {
+          return { success: false, message: `Gagal menandai notifikasi dibaca: ${error.message}` };
+        }
+        return { success: true, data: true };
+      } catch (err: any) {
+        return { success: false, message: `Gagal menandai notifikasi dibaca: ${err.message || err}` };
       }
     }
 
@@ -59,11 +79,22 @@ class NotificationService {
   }
 
   async markAllAsRead(userId: string): Promise<ApiResponse<boolean>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
-        await supabase.from('notifications').update({ read: true }).eq('recipient_user_id', userId);
-      } catch (err) {
-        console.warn('Supabase markAllAsRead error:', err);
+        const { error } = await supabase.from('notifications').update({ read: true }).eq('recipient_user_id', userId);
+        if (error) {
+          return { success: false, message: `Gagal menandai semua notifikasi dibaca: ${error.message}` };
+        }
+        return { success: true, data: true, message: 'Semua notifikasi ditandai telah dibaca' };
+      } catch (err: any) {
+        return { success: false, message: `Gagal menandai semua notifikasi dibaca: ${err.message || err}` };
       }
     }
 
@@ -88,7 +119,14 @@ class NotificationService {
     const now = new Date().toISOString();
     const id = `notif-${Date.now().toString().slice(-6)}`;
 
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Supabase belum terkonfigurasi untuk mode operasional.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const { data, error } = await supabase
           .from('notifications')
@@ -106,7 +144,10 @@ class NotificationService {
           .select()
           .single();
 
-        if (!error && data) {
+        if (error) {
+          return { success: false, message: `Gagal membuat notifikasi: ${error.message}` };
+        }
+        if (data) {
           const newItem: NotificationItem = {
             id: data.id,
             recipientUserId: data.recipient_user_id,
@@ -118,11 +159,11 @@ class NotificationService {
             readAt: null,
             createdAt: data.created_at,
           };
-          this.notifications.unshift(newItem);
           return { success: true, data: newItem };
         }
-      } catch (err) {
-        console.warn('Gagal membuat notifikasi di Supabase:', err);
+        return { success: false, message: 'Gagal membuat notifikasi' };
+      } catch (err: any) {
+        return { success: false, message: `Gagal membuat notifikasi: ${err.message || err}` };
       }
     }
 

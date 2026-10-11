@@ -281,11 +281,52 @@ class AuthService {
   }
 
   async getAllUsers(): Promise<User[]> {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return [];
+      }
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*, positions(nama)')
+          .order('created_at', { ascending: true });
+        if (error || !data) {
+          console.warn('Supabase getAllUsers error:', error);
+          return [];
+        }
+        return data.map((u: any) => ({
+          id: u.id,
+          authUserId: u.auth_user_id,
+          username: u.username,
+          nama: u.nama,
+          nik: u.nik,
+          nipd: u.nipd,
+          nomorWhatsapp: u.nomor_whatsapp,
+          fotoReference: u.foto_reference,
+          role: u.role,
+          jabatanId: u.jabatan_id,
+          jabatanNama: u.positions?.nama || u.jabatan_id || 'Aparatur Desa',
+          attendanceRequired: u.attendance_required,
+          active: u.active,
+          effectiveFrom: u.effective_from,
+        }));
+      } catch (err) {
+        console.warn('Supabase getAllUsers error:', err);
+        return [];
+      }
+    }
     return [...this.users];
   }
 
   async updateProfile(userId: string, data: Partial<User>): Promise<ApiResponse<User>> {
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Konfigurasi Supabase belum terpasang di environment.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const updatePayload: any = {};
         if (data.nomorWhatsapp !== undefined) updatePayload.nomor_whatsapp = data.nomorWhatsapp;
@@ -323,6 +364,7 @@ class AuthService {
           if (idx !== -1) this.users[idx] = user;
           return { success: true, data: user, message: 'Profil berhasil diperbarui' };
         }
+        return { success: false, message: 'Pengguna tidak ditemukan di database.' };
       } catch (err: any) {
         return { success: false, message: `Gagal memperbarui profil: ${err.message || err}` };
       }
@@ -340,12 +382,20 @@ class AuthService {
     if (newPass.length < 8) {
       return { success: false, message: 'Kata sandi minimal 8 karakter' };
     }
-    if (!IS_DEMO_MODE && isSupabaseConfigured()) {
+    if (!IS_DEMO_MODE) {
+      if (!isSupabaseConfigured()) {
+        return {
+          success: false,
+          message: 'Konfigurasi Supabase belum terpasang di environment.',
+          errorCode: 'SUPABASE_NOT_CONFIGURED',
+        };
+      }
       try {
         const { error } = await supabase.auth.updateUser({ password: newPass });
         if (error) {
           return { success: false, message: `Gagal mengubah kata sandi: ${error.message}` };
         }
+        return { success: true, data: true, message: 'Kata sandi berhasil diubah' };
       } catch (err: any) {
         return { success: false, message: `Gagal mengubah kata sandi: ${err.message}` };
       }
