@@ -215,12 +215,15 @@ class CorrectionService {
       }
       try {
         // Eksekusi Persetujuan Koreksi & Penerapan Presensi Secara Atomik di Database via RPC
-        const { error: rpcErr } = await supabase.rpc('apply_attendance_correction', {
+        const { data: rpcResult, error: appErr } = await supabase.rpc('apply_attendance_correction', {
           p_correction_id: correctionId,
         });
 
-        if (rpcErr) {
-          return { success: false, message: `Gagal menyetujui koreksi: ${rpcErr.message}` };
+        if (appErr) {
+          return { success: false, message: `Gagal menyetujui dan menerapkan koreksi: ${appErr.message}` };
+        }
+        if (!rpcResult?.success) {
+          return { success: false, message: 'Database tidak mengonfirmasi penerapan koreksi.' };
         }
 
         // Ambil data hasil pembaruan untuk pemetaan objek dan sinkronisasi cache
@@ -230,8 +233,8 @@ class CorrectionService {
           .eq('id', correctionId)
           .single();
 
-        if (fetchErr || !approvedCorr) {
-          return { success: false, message: 'Koreksi berhasil diterapkan di database, namun gagal membaca kembali data transaksi.' };
+        if (fetchErr || !approvedCorr || !approvedCorr.applied_at || !approvedCorr.applied_by) {
+          return { success: false, message: 'Koreksi belum terkonfirmasi diterapkan oleh database.' };
         }
 
         attendanceService.applyCorrection(approvedCorr.attendance_record_id, {
